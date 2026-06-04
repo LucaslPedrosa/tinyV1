@@ -1,0 +1,23 @@
+# Local Godot editor downloads.
+tools/godot/
+
+# Local Python/build tooling.
+.venv/
+
+# Local native dependency checkout.
+external/godot-cpp/
+
+# Godot generated/imported files.
+.godot/
+*.import
+
+# Native build outputs.
+bin/
+build/
+.sconsign.dblite
+*.o
+*.so
+*.dll
+*.dylib
+*.exe
+*:Zone.Identifier

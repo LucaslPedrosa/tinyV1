@@ -1,0 +1,124 @@
+[gd_scene load_steps=2 format=3 uid="uid://cn70qginpvvaa"]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_qn2s7"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_qn2s7")
+
+[node name="HudLayer" type="CanvasLayer" parent="."]
+layer = 10
+
+[node name="Label" type="Label" parent="HudLayer"]
+offset_left = 32.0
+offset_top = 32.0
+offset_right = 1248.0
+offset_bottom = 72.0
+text = "tinyV1 C++ GDExtension bootstrap"
+
+[node name="BottomHud" type="Control" parent="HudLayer"]
+z_index = 100
+layout_mode = 3
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -150.0
+grow_horizontal = 2
+grow_vertical = 0
+
+[node name="HudBackground" type="ColorRect" parent="HudLayer/BottomHud"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.055, 0.047, 0.065, 0.94)
+
+[node name="ResourcesBox" type="ColorRect" parent="HudLayer/BottomHud"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 16.0
+offset_right = 210.0
+offset_bottom = 134.0
+color = Color(0.12, 0.10, 0.075, 1)
+
+[node name="ResourcesLabel" type="Label" parent="HudLayer/BottomHud/ResourcesBox"]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 12.0
+offset_right = 176.0
+offset_bottom = 104.0
+text = "Food: 0\nWood: 0\nGold: 0"
+
+[node name="ActionsBox" type="ColorRect" parent="HudLayer/BottomHud"]
+layout_mode = 0
+offset_left = 250.0
+offset_top = 16.0
+offset_right = 760.0
+offset_bottom = 134.0
+color = Color(0.085, 0.095, 0.12, 1)
+
+[node name="ActionsTitle" type="Label" parent="HudLayer/BottomHud/ActionsBox"]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 10.0
+offset_right = 490.0
+offset_bottom = 34.0
+text = "Actions"
+
+[node name="ActionsLabel" type="Label" parent="HudLayer/BottomHud/ActionsBox"]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 40.0
+offset_right = 250.0
+offset_bottom = 106.0
+text = "Select a unit or building."
+
+[node name="ActionButton0" type="Button" parent="HudLayer/BottomHud/ActionsBox"]
+layout_mode = 0
+offset_left = 280.0
+offset_top = 38.0
+offset_right = 380.0
+offset_bottom = 104.0
+text = "No Action"
+
+[node name="ActionButton1" type="Button" parent="HudLayer/BottomHud/ActionsBox"]
+layout_mode = 0
+offset_left = 394.0
+offset_top = 38.0
+offset_right = 494.0
+offset_bottom = 104.0
+text = ""
+
+[node name="SelectionBox" type="ColorRect" parent="HudLayer/BottomHud"]
+layout_mode = 0
+offset_left = 800.0
+offset_top = 16.0
+offset_right = 1260.0
+offset_bottom = 134.0
+color = Color(0.075, 0.08, 0.095, 1)
+
+[node name="Portrait" type="ColorRect" parent="HudLayer/BottomHud/SelectionBox"]
+layout_mode = 0
+offset_left = 14.0
+offset_top = 14.0
+offset_right = 94.0
+offset_bottom = 94.0
+color = Color(0.18, 0.18, 0.2, 1)
+
+[node name="NameLabel" type="Label" parent="HudLayer/BottomHud/SelectionBox"]
+layout_mode = 0
+offset_left = 112.0
+offset_top = 12.0
+offset_right = 440.0
+offset_bottom = 36.0
+text = "No Selection"
+
+[node name="DetailsLabel" type="Label" parent="HudLayer/BottomHud/SelectionBox"]
+layout_mode = 0
+offset_left = 112.0
+offset_top = 42.0
+offset_right = 440.0
+offset_bottom = 106.0
+text = "No unit selected."
