@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>tinyV1 Game</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 24px;
+        background: #f3f4f6;
+        color: #111827;
+      }
+      .game {
+        max-width: 520px;
+        margin: 0 auto;
+      }
+      .hud {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 12px;
+      }
+      #board {
+        position: relative;
+        width: 500px;
+        height: 300px;
+        border: 2px solid #111827;
+        border-radius: 8px;
+        background: #fff;
+        overflow: hidden;
+      }
+      #target {
+        position: absolute;
+        width: 34px;
+        height: 34px;
+        background: #ef4444;
+        border-radius: 50%;
+        cursor: pointer;
+      }
+      button {
+        margin-top: 12px;
+        padding: 8px 12px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="game">
+      <h1>Catch the Dot</h1>
+      <p>Click the red dot as many times as you can in 20 seconds.</p>
+      <div class="hud">
+        <strong>Score: <span id="score">0</span></strong>
+        <strong>Time: <span id="time">20</span>s</strong>
+      </div>
+      <div id="board" aria-label="Game board">
+        <div id="target" aria-label="Target"></div>
+      </div>
+      <button id="startBtn" type="button">Start Game</button>
+      <p id="status" aria-live="polite"></p>
+    </main>
+    <script>
+      const board = document.getElementById("board");
+      const target = document.getElementById("target");
+      const scoreEl = document.getElementById("score");
+      const timeEl = document.getElementById("time");
+      const startBtn = document.getElementById("startBtn");
+      const statusEl = document.getElementById("status");
+
+      let score = 0;
+      let timeLeft = 20;
+      let intervalId = null;
+      let running = false;
+
+      function moveTarget() {
+        const maxX = board.clientWidth - target.offsetWidth;
+        const maxY = board.clientHeight - target.offsetHeight;
+        const x = Math.floor(Math.random() * (maxX + 1));
+        const y = Math.floor(Math.random() * (maxY + 1));
+        target.style.left = `${x}px`;
+        target.style.top = `${y}px`;
+      }
+
+      function updateHud() {
+        scoreEl.textContent = String(score);
+        timeEl.textContent = String(timeLeft);
+      }
+
+      function stopGame() {
+        running = false;
+        clearInterval(intervalId);
+        intervalId = null;
+        statusEl.textContent = `Game over! Final score: ${score}`;
+        startBtn.disabled = false;
+      }
+
+      function startGame() {
+        score = 0;
+        timeLeft = 20;
+        running = true;
+        statusEl.textContent = "";
+        startBtn.disabled = true;
+        updateHud();
+        moveTarget();
+
+        intervalId = setInterval(() => {
+          timeLeft -= 1;
+          updateHud();
+          moveTarget();
+
+          if (timeLeft <= 0) {
+            stopGame();
+          }
+        }, 1000);
+      }
+
+      target.addEventListener("click", () => {
+        if (!running) return;
+        score += 1;
+        updateHud();
+        moveTarget();
+      });
+
+      startBtn.addEventListener("click", startGame);
+      moveTarget();
+    </script>
+  </body>
+</html>
