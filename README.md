@@ -6,18 +6,32 @@ See `DESIGN.md` for the current game design notes and MVP roadmap.
 
 ## Local Setup
 
-The Godot editor was downloaded locally to `tools/godot/`, which is ignored by Git.
+Local tools and dependencies are project-local and ignored by Git. For a fresh checkout, run:
+
+```bash
+./dev/setup_dev.sh
+```
+
+This creates `.venv/`, downloads Godot to `tools/godot/`, installs SCons, and checks out the pinned `godot-cpp` dependency.
+
+Pinned versions are documented in `dev/README.md`.
 
 Run the editor:
 
 ```bash
-./tools/godot/Godot_v4.6.3-stable_linux.x86_64
+./tools/godot/Godot_v4.6.3-stable_linux.x86_64 --path .
+```
+
+Run the main scene:
+
+```bash
+./dev/run.sh
 ```
 
 Run a headless project load check:
 
 ```bash
-./tools/godot/Godot_v4.6.3-stable_linux.x86_64 --headless --path . --quit
+./dev/check_headless.sh
 ```
 
 ## C++ Build
@@ -30,23 +44,10 @@ Local tooling and dependencies are ignored by Git:
 - `external/godot-cpp/`
 - `bin/`
 
-If needed, create the local Python environment and install SCons:
-
-```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip scons
-```
-
-Fetch `godot-cpp`:
-
-```bash
-git clone --depth 1 https://github.com/godotengine/godot-cpp.git external/godot-cpp
-```
-
 Build the debug GDExtension library:
 
 ```bash
-.venv/bin/scons platform=linux target=template_debug arch=x86_64
+./dev/build_debug.sh
 ```
 
 The built library should appear at:
@@ -54,6 +55,25 @@ The built library should appear at:
 ```text
 bin/libtinyv1.linux.template_debug.x86_64.so
 ```
+
+## Team Workflow
+
+Typical loop:
+
+```bash
+./dev/setup_dev.sh
+./dev/build_debug.sh
+./dev/run.sh
+```
+
+Before sharing changes, run:
+
+```bash
+./dev/build_debug.sh
+./dev/check_headless.sh
+```
+
+Do not commit local/generated paths such as `.venv/`, `tools/godot/`, `external/godot-cpp/`, `bin/`, or `.godot/`.
 
 ## Prototype Controls
 
