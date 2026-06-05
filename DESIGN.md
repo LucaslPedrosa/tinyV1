@@ -24,7 +24,7 @@ The long-term civilization direction is mythological, not generic fantasy.
 Example civilization families:
 
 - Greeks: Zeus, Poseidon, Hades
-- Egyptians: Ra, Horus, Anubis, Isis, Set
+- Egyptians: Ra, Anubis, Isis, Set
 - Norse: Odin, Thor, Loki, Freyja
 - Other pantheons can be added later if the core game works
 
@@ -52,18 +52,9 @@ For the first playable version, use only one generic starter civilization. The g
 
 ## Initial Resource Model
 
-Start with one resource only.
+Start with Tree or four resources:
 
-Possible names:
-
-- Favor
-- Tribute
-- Crystal
-- Essence
-
-Recommendation for prototype: use `Essence` as a neutral resource name until civilization-specific economy is added.
-
-Later versions can add more resources, such as food, stone, gold, or favor, but the first version should avoid economy complexity.
+Food, Wood, Gold, and Favor.
 
 ## Initial Units
 
@@ -72,27 +63,38 @@ Prototype units:
 - Worker: gathers resources, builds structures, repairs buildings
 - Fighter: cheap melee combat unit
 
-Later units:
+
+The game is supposed to have complex combat and unit interactions eventually, but the first prototype should be simple to prove the core loop. More unit types can be added later:
 
 - Ranged unit
 - Heavy unit
+- C
 - Scout
-- Mythic unique unit per civilization or god
+- Mythics unique units per civilization or god
 
 ## Initial Buildings
 
-Prototype buildings:
+Buildings:
 
-- Main Base: player survival anchor and worker production
+
+- Town center: main base, produces workers, anchors player position
 - Resource Dropoff: optional if resources are far from the main base
+
+Military:
 - Barracks: trains fighters
+- Stable: trains mounted units
+- Archery Range: trains ranged units
+- Siege Workshop: trains siege units
+- Temple: trains mythic units, unlocks god powers
 
-Later buildings:
+Other:
+- Tower: basic defense structure
+- Walls: block movement, provide defense
+- Arsenal: upgrades units, unlocks tech
+- Market: trade resources, gain gold
+- God-specific unique buildings can be added later
 
-- Tower
-- Wall or gate
-- Temple
-- God-specific unique building
+- Maybe statues idk more to be added later
 
 ## Map Pressure Mechanic
 
@@ -106,20 +108,13 @@ Preferred mechanic:
 
 Theme options for the border:
 
-- Divine storm
 - Void fog
 - World collapse
 - Wrath of the gods
 
-Prototype name: `Divine Storm`.
+Prototype name: `Wrath of the gods`.
 
 ## Win Conditions
-
-First prototype:
-
-- Destroy the enemy Main Base.
-
-Later options:
 
 - Last player alive
 - Hold center shrine for a fixed time
@@ -194,57 +189,3 @@ Practical note:
 - Building everything in C++ is possible, but Godot C++ development has more setup than GDScript.
 - A pragmatic approach is to prototype gameplay quickly, then move performance-critical or stable systems to C++.
 
-## Major Systems
-
-- GameManager: match state, players, win conditions
-- PlayerState: resources, civilization, owned units and buildings
-- Unit: health, movement, commands, combat
-- Building: health, production, construction state
-- ResourceNode: resource amount and gathering behavior
-- CommandSystem: move, attack, gather, build, train
-- BorderSystem: shrinking dangerous border
-- BotController: AI decisions
-- NetworkManager: host, join, command replication, state sync
-- SelectionController: mouse selection and command targeting
-
-## MVP Roadmap
-
-### MVP 1: Local Core Loop
-
-- Godot project boots
-- Square 2D map
-- 1 human player and 1 bot
-- Main base, workers, one resource, barracks, fighters
-- Gather, build, train, attack
-- Destroy enemy base to win
-
-### MVP 2: Arena Pressure
-
-- Add Divine Storm border
-- Damage units and buildings outside the safe area
-- Tune match duration toward 10 minutes
-
-### MVP 3: 2 To 4 Players
-
-- Add up to 4 spawn positions
-- Add bot slots
-- Add basic lobby configuration locally
-
-### MVP 4: Online Host/Join
-
-- Host-authoritative multiplayer
-- Clients send commands to host
-- Host replicates state
-- Bots run on host
-
-### MVP 5: Mythological Civilizations
-
-- Add Greek god prototype, likely Zeus first
-- Add Egyptian god prototype later
-- Add unique powers, units, or buildings gradually
-
-## First Implementation Target
-
-The first playable target is:
-
-> A local 1v1 prototype where both sides use the same generic civilization. Each player starts with a Main Base and workers, gathers Essence, builds a Barracks, trains Fighters, and wins by destroying the enemy Main Base.

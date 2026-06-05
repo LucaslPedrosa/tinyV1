@@ -3,6 +3,7 @@ tools/godot/
 
 # Local Python/build tooling.
 .venv/
+compile_commands.json
 
 # Local native dependency checkout.
 external/godot-cpp/
@@ -16,6 +17,7 @@ bin/
 build/
 .sconsign.dblite
 *.o
+*.os
 *.so
 *.dll
 *.dylib

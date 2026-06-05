@@ -84,15 +84,25 @@ The current prototype is a local 1v1 test against a simple bot.
 - Drag starting on a blue unit filters the box selection to that unit type.
 - Double click a blue unit to select all owned units of that type.
 - Left click the blue base to select the base.
-- Select a worker and click `Barracks` or press `B`, then left click the map to place it.
+- Select a worker and click `Barracks` or press `B`, then left click the map to place a construction site.
 - Right click while placing a Barracks to cancel placement.
+- Right click an unfinished Barracks with a worker selected to resume construction.
+- Press `Delete` while placing a Barracks ghost to cancel it.
+- Press `Delete` with an unfinished Barracks selected to destroy it and refund 100% of its cost.
+- Press `Delete` with a completed Barracks selected to destroy it and refund 50% of its cost.
 - Right click with selected units to move in a small formation.
 - Right click an Essence node with workers selected to gather.
 - Right click ground with fighters selected to attack-move in formation.
+- Right click an enemy unit with fighters selected to attack that unit.
+- Right click an enemy Barracks with fighters selected to attack that Barracks.
 - Right click the enemy base with fighters selected to attack it.
 - Press `W` with the base selected to train a worker.
-- Press `F` with a Barracks selected to train a fighter.
+- Press `F` with a completed Barracks selected to train a fighter.
+- Right click with a production building selected to set its rally point.
+- Newly trained units automatically move to that building's rally point.
 - Click the base action buttons in the center HUD to train units.
+- Unit training takes time and shows progress on the producing building.
+- Unit training can be queued up to 3 units per producing building.
 - Destroy the red base to win.
 - If the match ends, press any key to restart.
 
@@ -101,15 +111,19 @@ Current prototype pieces:
 - Blue human player
 - Red bot player
 - Main bases
-- Barracks built by workers
+- Barracks construction sites built by workers over time
 - Workers
 - Fighters
 - Essence nodes
-- Greece sprites for Worker, Hoplite, Town Center, Barracks, and Goldmine
+- Pixel Greece sprites for Worker, Hoplite, Town Center, Barracks, and Gold
 - Bottom HUD with Food, Wood, and Gold resource display
 - Selection HUD with actions, portrait placeholder, name, and details
 - Clickable base action buttons for training workers and fighters
-- Main Base trains workers, Barracks trains fighters
+- Main Base trains workers, completed Barracks train fighters
+- One active training job per producing building
+- Workers spend time mining before carrying Gold back to base
+- Health bars for units and buildings
+- Fighters can target enemy units, Barracks, or the Main Base
 - Playable map area reserved above the bottom HUD
 - Worker gathering and return behavior
 - Bot economy, unit training, and attack waves

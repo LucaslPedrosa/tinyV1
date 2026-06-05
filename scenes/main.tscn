@@ -8,13 +8,6 @@ script = ExtResource("1_qn2s7")
 [node name="HudLayer" type="CanvasLayer" parent="."]
 layer = 10
 
-[node name="Label" type="Label" parent="HudLayer"]
-offset_left = 32.0
-offset_top = 32.0
-offset_right = 1248.0
-offset_bottom = 72.0
-text = "tinyV1 C++ GDExtension bootstrap"
-
 [node name="BottomHud" type="Control" parent="HudLayer"]
 z_index = 100
 layout_mode = 3
@@ -69,26 +62,66 @@ text = "Actions"
 
 [node name="ActionsLabel" type="Label" parent="HudLayer/BottomHud/ActionsBox"]
 layout_mode = 0
-offset_left = 14.0
+offset_left = 250.0
 offset_top = 40.0
-offset_right = 250.0
+offset_right = 496.0
 offset_bottom = 106.0
 text = "Select a unit or building."
 
 [node name="ActionButton0" type="Button" parent="HudLayer/BottomHud/ActionsBox"]
 layout_mode = 0
-offset_left = 280.0
-offset_top = 38.0
-offset_right = 380.0
-offset_bottom = 104.0
-text = "No Action"
+offset_left = 14.0
+offset_top = 18.0
+offset_right = 120.0
+offset_bottom = 112.0
+
+[node name="Icon" type="TextureRect" parent="HudLayer/BottomHud/ActionsBox/ActionButton0"]
+layout_mode = 0
+offset_left = 21.0
+offset_top = 6.0
+offset_right = 85.0
+offset_bottom = 70.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 0
+
+[node name="Text" type="Label" parent="HudLayer/BottomHud/ActionsBox/ActionButton0"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 70.0
+offset_right = 102.0
+offset_bottom = 92.0
+mouse_filter = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+text = ""
 
 [node name="ActionButton1" type="Button" parent="HudLayer/BottomHud/ActionsBox"]
 layout_mode = 0
-offset_left = 394.0
-offset_top = 38.0
-offset_right = 494.0
-offset_bottom = 104.0
+offset_left = 134.0
+offset_top = 18.0
+offset_right = 240.0
+offset_bottom = 112.0
+
+[node name="Icon" type="TextureRect" parent="HudLayer/BottomHud/ActionsBox/ActionButton1"]
+layout_mode = 0
+offset_left = 21.0
+offset_top = 6.0
+offset_right = 85.0
+offset_bottom = 70.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 0
+
+[node name="Text" type="Label" parent="HudLayer/BottomHud/ActionsBox/ActionButton1"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 70.0
+offset_right = 102.0
+offset_bottom = 92.0
+mouse_filter = 2
+horizontal_alignment = 1
+vertical_alignment = 1
 text = ""
 
 [node name="SelectionBox" type="ColorRect" parent="HudLayer/BottomHud"]
@@ -99,13 +132,14 @@ offset_right = 1260.0
 offset_bottom = 134.0
 color = Color(0.075, 0.08, 0.095, 1)
 
-[node name="Portrait" type="ColorRect" parent="HudLayer/BottomHud/SelectionBox"]
+[node name="Portrait" type="TextureRect" parent="HudLayer/BottomHud/SelectionBox"]
 layout_mode = 0
 offset_left = 14.0
 offset_top = 14.0
 offset_right = 94.0
 offset_bottom = 94.0
-color = Color(0.18, 0.18, 0.2, 1)
+expand_mode = 1
+stretch_mode = 0
 
 [node name="NameLabel" type="Label" parent="HudLayer/BottomHud/SelectionBox"]
 layout_mode = 0
