@@ -15,6 +15,10 @@ The project is a Godot 4 scene backed by a C++ GDExtension.
 - `GameTypes` contains plain gameplay data structures and enums.
 - `game_constants.hpp` contains shared constants and small gameplay/math helpers.
 
+Current state detail:
+
+- Unit action state is split across `MovementComponent`, `CombatComponent`, `GatherComponent`, and `BuildComponent`.
+
 ## Modules
 
 ### `scripts/main.gd`
@@ -53,15 +57,14 @@ Responsibilities:
 
 Communication:
 
-- Reads simulation vectors directly through a temporary reference bridge.
+- Reads simulation render state through read-only render queries.
 - Reads/writes local UI state through `LocalPlayerState`.
 - Calls `GameSimulation::apply_command` for player gameplay actions.
 - Asks `BotController` for bot commands each frame and submits them to `GameSimulation::apply_command`.
 
 Important temporary coupling:
 
-- `TinyGame` still has direct reference aliases to simulation fields like `units`, `barracks`, `bases`, and `resources` for rendering and HUD.
-- This is convenient but means `TinyGame` can still see too much simulation internals.
+- `TinyGame` still owns rendering details and sprite sizing for simulation objects.
 
 ### `LocalPlayerState`
 
@@ -115,6 +118,13 @@ Current data structs:
 - `Base`
 - `Barracks`
 - `Unit`
+- `OwnerComponent`
+- `TransformComponent`
+- `HealthComponent`
+- `MovementComponent`
+- `CombatComponent`
+- `GatherComponent`
+- `BuildComponent`
 - `CommandFeedback`
 - `SelectionResult`
 
@@ -122,7 +132,7 @@ Notes:
 
 - IDs are currently aliases over `int32_t`, not strong wrapper types.
 - `Barracks` has a stable `BuildingId`.
-- `Unit` targets buildings with `target_building_id`, not a vector index.
+- `Unit` targets buildings and enemies through componentized stable IDs, not vector indices.
 
 ### `GameCommand`
 
@@ -219,6 +229,7 @@ Responsibilities:
 - Own resources, bases, Barracks, units, player/bot gold, next IDs, and winner text.
 - Reset the match.
 - Update unit movement, gathering, returning, construction, attacks, and timers.
+- Keep unit action state componentized, with per-action handlers in `game_simulation_update.cpp`.
 - Update production queues and spawning.
 - Place and delete Barracks.
 - Resolve selection queries into `SelectionResult`.
@@ -230,13 +241,12 @@ Responsibilities:
 Communication:
 
 - Called through `GameSimulation::apply_command` for human and bot gameplay input.
-- Called directly by `TinyGame` for HUD-related queries.
+- Called directly by `TinyGame` for render and HUD-related queries.
 - Called internally by update logic and production logic.
 - Returns local/presentation results through `SelectionResult` and `CommandFeedback`.
 
 Important temporary coupling:
 
-- `GameSimulation` still exposes its vectors publicly.
 - The command path is still a thin wrapper over existing simulation methods.
 
 ## GameSimulation Files
@@ -261,7 +271,10 @@ Responsibilities:
 - Find nearest resource.
 - Find enemy units or buildings at a clicked position.
 - Find available bot worker.
-- Provide read-only query helpers used by `BotController`.
+- Provide read-only query helpers used by `BotController` and player input/HUD code.
+- Provide summary queries for units, bases, and buildings.
+- Provide render read models for resources, bases, buildings, and units.
+- Provide command-availability queries for current player actions.
 
 ### `game_simulation_update.cpp`
 
@@ -493,11 +506,7 @@ Desired discipline for current code:
 
 ## Known Temporary Couplings
 
-- `TinyGame` still has direct reference aliases to simulation state.
-- `GameSimulation` still exposes public vectors.
-- `TinyGame` still performs some action validation for HUD buttons.
 - `GameCommand` is still a thin command envelope over existing simulation methods.
-- `TinyGame` and HUD code still read public simulation internals directly.
 - Bases are still referenced by owner instead of a stable `BuildingId`.
 - ID aliases are still plain `int32_t` aliases.
 - Stats and costs are still hardcoded in C++.

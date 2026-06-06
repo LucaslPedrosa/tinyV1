@@ -24,6 +24,7 @@ Current split:
 - `LocalPlayerState` owns local selection, drag selection, placement preview, and command marker presentation state.
 - `BotController` owns temporary bot decision timing and emits bot commands.
 - `GameSimulation` owns authoritative match state, unit updates, gathering, combat, production, Barracks lifecycle, command application helpers, cleanup, and win checks.
+- Unit action state is now split into dedicated components inside `Unit` instead of a flat action field set.
 - `GameTypes.hpp` contains the basic enums and structs.
 - `game_constants.hpp` contains shared constants and small math/stat helpers.
 
@@ -34,7 +35,7 @@ Current architectural problem:
 - Player input now uses the first `GameCommand` path for commands, training, placement, and deletion.
 - Bot behavior now emits `GameCommand` values for gathering recovery, training, building, and attacks.
 - Bot decisions now live in `BotController` and read simulation state through initial read-only queries.
-- Simulation internals are still too public and `TinyGame` still has a temporary reference bridge for rendering/HUD.
+- Simulation internals are now private; remaining architecture work is reducing command/helper thin wrappers and preparing data-driven/composed game objects.
 
 ## Guiding Direction
 
@@ -69,6 +70,8 @@ Completed immediate-priority items:
 - Bot behavior was routed through the initial `GameCommand` path.
 - Bot decisions were extracted from `GameSimulation` into `BotController`.
 - Initial read-only queries exist for `BotController`.
+- Basic composition components were introduced for `Unit`, `Base`, and `Barracks`. Done: `OwnerComponent`, `TransformComponent`, and `HealthComponent` now back the shared identity/position/HP data.
+- Unit action state was componentized. Done: `MovementComponent`, `CombatComponent`, `GatherComponent`, and `BuildComponent` now hold the per-action unit state.
 
 ## Phase 1: Completed Extraction From TinyGame
 
@@ -86,6 +89,7 @@ Completed tasks:
 - Move selection logic into `GameSimulation`. Done: click selection, box selection, double-click select-by-type, selected counts, and first-selected lookup now live in `GameSimulation`.
 - Move bot decisions into `GameSimulation`. Done: bot gathering recovery, worker/fighter production, Barracks placement, and attack wave assignment now live in `GameSimulation`.
 - Move unit simulation into `GameSimulation`. Done: movement, gathering/returning, Barracks construction, auto-aggro, attacks, combat damage, and per-unit timers now live in `GameSimulation`.
+- Componentize unit action state. Done: movement, combat, gather, and build state now live in dedicated unit components.
 
 Definition of done:
 
@@ -264,7 +268,7 @@ Definition of done:
 - Bot cannot mutate state except through commands. Done for current behavior.
 - Human and bot training/building/attack use the same command validation path. Done for current behavior.
 
-Status: done for initial extraction. Remaining debt: render/HUD code still reads public simulation internals directly until Phase 7 query/encapsulation work.
+Status: done for initial extraction. Render/HUD/input/bot now read simulation state through queries/read models.
 
 ## Phase 7: Simulation Queries And Encapsulation
 
@@ -274,11 +278,19 @@ Tasks:
 
 - Reduce public access to `units`, `bases`, `barracks`, and `resources` over time.
 - Add read-only query methods for bot decisions. Done for current `BotController` behavior.
-- Add read-only query methods for rendering.
-- Add read-only query methods for HUD selection/details/action availability.
-- Replace `const_cast<TinyGame *>(this)->sim.find_base(...)` patterns with const-safe queries.
-- Move HUD action availability checks into simulation or command validation queries.
-- Remove the temporary reference bridge in `TinyGame` when practical.
+- Add read-only query methods for player input/HUD summaries/action availability. Done for current player input and HUD callbacks.
+- Add read-only query methods for rendering. Done for current render state.
+- Add read-only query methods for HUD selection/details/action availability. Done for current HUD callbacks.
+- Replace `const_cast<TinyGame *>(this)->sim.find_base(...)` patterns with const-safe queries. Done.
+- Move HUD action availability checks into simulation or command validation queries. Done for current action buttons.
+- Remove the temporary reference bridge in `TinyGame` when practical. Done.
+
+Current result:
+
+- Bot decisions use read-only queries.
+- Player input/HUD uses summaries and action-availability queries.
+- Rendering uses read-only render models.
+- Core simulation state is private in `GameSimulation`.
 
 Definition of done:
 

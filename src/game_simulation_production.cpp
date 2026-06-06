@@ -10,44 +10,44 @@ namespace tinyv1 {
 
 void GameSimulation::update_training(double p_delta) {
 	for (Base &base : bases) {
-		if (!base.training_worker && base.worker_queue > 0) {
-			base.training_worker = true;
-			base.train_timer = WORKER_TRAIN_TIME;
-			base.train_duration = WORKER_TRAIN_TIME;
+		if (!base.production_component.training && base.production_component.queue > 0) {
+			base.production_component.training = true;
+			base.production_component.train_timer = WORKER_TRAIN_TIME;
+			base.production_component.train_duration = WORKER_TRAIN_TIME;
 		}
 
-		if (!base.training_worker) {
+		if (!base.production_component.training) {
 			continue;
 		}
 
-		base.train_timer -= static_cast<float>(p_delta);
-		if (base.train_timer <= 0.0f) {
-			base.training_worker = false;
-			base.train_timer = 0.0f;
-			base.train_duration = 0.0f;
-			base.worker_queue = std::max(0, base.worker_queue - 1);
-			spawn_unit(base.owner, UnitType::WORKER, base.position, base.has_rally_point, base.rally_point);
+		base.production_component.train_timer -= static_cast<float>(p_delta);
+		if (base.production_component.train_timer <= 0.0f) {
+			base.production_component.training = false;
+			base.production_component.train_timer = 0.0f;
+			base.production_component.train_duration = 0.0f;
+			base.production_component.queue = std::max(0, base.production_component.queue - 1);
+			spawn_unit(base.owner_component.owner, UnitType::WORKER, base.transform_component.position, base.rally_component.has_rally_point, base.rally_component.rally_point);
 		}
 	}
 
 	for (Barracks &building : barracks) {
-		if (!building.training_fighter && building.completed && building.fighter_queue > 0) {
-			building.training_fighter = true;
-			building.train_timer = FIGHTER_TRAIN_TIME;
-			building.train_duration = FIGHTER_TRAIN_TIME;
+		if (!building.production_component.training && building.construction_component.completed && building.production_component.queue > 0) {
+			building.production_component.training = true;
+			building.production_component.train_timer = FIGHTER_TRAIN_TIME;
+			building.production_component.train_duration = FIGHTER_TRAIN_TIME;
 		}
 
-		if (!building.training_fighter) {
+		if (!building.production_component.training) {
 			continue;
 		}
 
-		building.train_timer -= static_cast<float>(p_delta);
-		if (building.train_timer <= 0.0f) {
-			building.training_fighter = false;
-			building.train_timer = 0.0f;
-			building.train_duration = 0.0f;
-			building.fighter_queue = std::max(0, building.fighter_queue - 1);
-			spawn_unit(building.owner, UnitType::FIGHTER, building.position, building.has_rally_point, building.rally_point);
+		building.production_component.train_timer -= static_cast<float>(p_delta);
+		if (building.production_component.train_timer <= 0.0f) {
+			building.production_component.training = false;
+			building.production_component.train_timer = 0.0f;
+			building.production_component.train_duration = 0.0f;
+			building.production_component.queue = std::max(0, building.production_component.queue - 1);
+			spawn_unit(building.owner_component.owner, UnitType::FIGHTER, building.transform_component.position, building.rally_component.has_rally_point, building.rally_component.rally_point);
 		}
 	}
 }
@@ -63,24 +63,24 @@ void GameSimulation::train_unit(int32_t p_owner, UnitType p_type, BuildingId p_s
 	Barracks *source_barracks = nullptr;
 	if (p_type == UnitType::FIGHTER) {
 		Barracks *selected_barracks = find_barracks_by_id(p_source_building_id);
-		if (selected_barracks != nullptr && selected_barracks->owner == p_owner && selected_barracks->completed) {
+		if (selected_barracks != nullptr && selected_barracks->owner_component.owner == p_owner && selected_barracks->construction_component.completed) {
 			source_barracks = selected_barracks;
 		} else {
 			source_barracks = find_completed_barracks(p_owner);
 		}
 	}
-	if (p_type == UnitType::WORKER && (base == nullptr || base->worker_queue >= MAX_TRAIN_QUEUE)) {
+	if (p_type == UnitType::WORKER && (base == nullptr || base->production_component.queue >= MAX_TRAIN_QUEUE)) {
 		return;
 	}
-	if (p_type == UnitType::FIGHTER && (source_barracks == nullptr || source_barracks->fighter_queue >= MAX_TRAIN_QUEUE)) {
+	if (p_type == UnitType::FIGHTER && (source_barracks == nullptr || source_barracks->production_component.queue >= MAX_TRAIN_QUEUE)) {
 		return;
 	}
 
 	essence -= cost;
 	if (p_type == UnitType::WORKER) {
-		base->worker_queue++;
+		base->production_component.queue++;
 	} else {
-		source_barracks->fighter_queue++;
+		source_barracks->production_component.queue++;
 	}
 }
 
@@ -88,16 +88,17 @@ void GameSimulation::spawn_unit(int32_t p_owner, UnitType p_type, const Vector2 
 	const float side = p_owner == PLAYER ? 1.0f : -1.0f;
 	Unit unit;
 	unit.id = next_unit_id++;
-	unit.owner = p_owner;
+	unit.owner_component.owner = p_owner;
 	unit.type = p_type;
-	unit.position = p_source_position + Vector2(70.0f * side, 24.0f * ((unit.id % 3) - 1));
-	unit.target_position = unit.position;
-	unit.hp = p_type == UnitType::WORKER ? 45.0f : 80.0f;
+	unit.transform_component.position = p_source_position + Vector2(70.0f * side, 24.0f * ((unit.id % 3) - 1));
+	unit.movement_component.target_position = unit.transform_component.position;
+	unit.health_component.hp = p_type == UnitType::WORKER ? 45.0f : 80.0f;
+	unit.health_component.max_hp = p_type == UnitType::WORKER ? 45.0f : 80.0f;
 	if (p_has_rally_point) {
-		unit.target_position = p_rally_point;
+		unit.movement_component.target_position = p_rally_point;
 		unit.order = UnitOrder::MOVE;
 	} else if (p_owner == BOT && p_type == UnitType::WORKER) {
-		unit.target_resource = find_nearest_resource(unit.position);
+		unit.gather_component.target_resource = find_nearest_resource(unit.transform_component.position);
 		unit.order = UnitOrder::GATHER;
 	}
 	units.push_back(unit);
@@ -115,12 +116,20 @@ BuildingId GameSimulation::place_barracks(int32_t p_owner, const Vector2 &p_posi
 
 	essence -= static_cast<int32_t>(BARRACKS_COST);
 	const BuildingId building_id = next_building_id++;
-	barracks.push_back({ building_id, p_owner, p_position, 250.0f, 0.0f, false });
-	if (p_builder != nullptr && p_builder->owner == p_owner && p_builder->type == UnitType::WORKER) {
-		p_builder->gathering_resource = false;
+	Barracks building;
+	building.id = building_id;
+	building.owner_component.owner = p_owner;
+	building.transform_component.position = p_position;
+	building.health_component.hp = 250.0f;
+	building.health_component.max_hp = 250.0f;
+	building.construction_component.build_progress = 0.0f;
+	building.construction_component.completed = false;
+	barracks.push_back(building);
+	if (p_builder != nullptr && p_builder->owner_component.owner == p_owner && p_builder->type == UnitType::WORKER) {
+		p_builder->gather_component.gathering_resource = false;
 		p_builder->order = UnitOrder::BUILD;
-		p_builder->target_building_id = building_id;
-		p_builder->target_position = p_position;
+		p_builder->build_component.target_building_id = building_id;
+		p_builder->movement_component.target_position = p_position;
 	}
 	return building_id;
 }
@@ -138,17 +147,23 @@ void GameSimulation::delete_barracks(BuildingId p_building_id) {
 	}
 
 	const Barracks removed = barracks[barracks_index];
-	if (removed.owner == PLAYER) {
-		player_essence += removed.completed ? static_cast<int32_t>(BARRACKS_COST * 0.5f) : static_cast<int32_t>(BARRACKS_COST);
+	if (removed.owner_component.owner == PLAYER) {
+		player_essence += removed.construction_component.completed ? static_cast<int32_t>(BARRACKS_COST * 0.5f) : static_cast<int32_t>(BARRACKS_COST);
 	} else {
-		bot_essence += removed.completed ? static_cast<int32_t>(BARRACKS_COST * 0.5f) : static_cast<int32_t>(BARRACKS_COST);
+		bot_essence += removed.construction_component.completed ? static_cast<int32_t>(BARRACKS_COST * 0.5f) : static_cast<int32_t>(BARRACKS_COST);
 	}
 
 	barracks.erase(barracks.begin() + barracks_index);
 	for (Unit &unit : units) {
-		if (unit.target_building_id == p_building_id) {
-			unit.target_building_id = -1;
+		if (unit.build_component.target_building_id == p_building_id) {
+			unit.build_component.target_building_id = -1;
 			if (unit.order == UnitOrder::BUILD) {
+				unit.order = UnitOrder::IDLE;
+			}
+		}
+		if (unit.combat_component.target_building_id == p_building_id) {
+			unit.combat_component.target_building_id = -1;
+			if (unit.order == UnitOrder::ATTACK) {
 				unit.order = UnitOrder::IDLE;
 			}
 		}

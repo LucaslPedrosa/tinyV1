@@ -21,16 +21,6 @@ class TinyGame : public godot::Node2D {
 	GameSimulation sim;
 	BotController bot;
 	LocalPlayerState local;
-	// Temporary bridge while systems are moved out of TinyGame incrementally.
-	godot::Rect2 &map_rect = sim.map_rect;
-	std::vector<ResourceNode> &resources = sim.resources;
-	std::vector<Base> &bases = sim.bases;
-	std::vector<Barracks> &barracks = sim.barracks;
-	std::vector<Unit> &units = sim.units;
-	int32_t &player_essence = sim.player_essence;
-	int32_t &bot_essence = sim.bot_essence;
-	int32_t &next_unit_id = sim.next_unit_id;
-	godot::String &winner_text = sim.winner_text;
 	godot::Ref<godot::Texture2D> worker_texture;
 	godot::Ref<godot::Texture2D> fighter_texture;
 	godot::Ref<godot::Texture2D> base_texture;
@@ -65,11 +55,11 @@ public:
 private:
 	void reset_match();
 	void load_textures();
-	const Unit *first_selected_unit() const;
-	const Barracks *selected_barracks() const;
-	float unit_radius(const Unit &p_unit) const;
-	godot::Vector2 unit_sprite_size(const Unit &p_unit) const;
-	godot::Vector2 unit_sprite_top_left(const Unit &p_unit) const;
+	bool first_selected_unit_summary(UnitSummary &r_summary) const;
+	bool selected_building_summary(BuildingSummary &r_summary) const;
+	float unit_radius(const UnitSummary &p_unit) const;
+	godot::Vector2 unit_sprite_size(const UnitSummary &p_unit) const;
+	godot::Vector2 unit_sprite_top_left(const UnitSummary &p_unit) const;
 	godot::Color owner_color(int32_t p_owner) const;
 };
 

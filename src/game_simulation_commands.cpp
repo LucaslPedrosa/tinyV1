@@ -31,17 +31,17 @@ bool GameSimulation::set_selected_production_rally_point(int32_t p_owner, int32_
 	if (p_selected_base_owner == p_owner) {
 		Base *base = find_base(p_owner);
 		if (base != nullptr) {
-			base->has_rally_point = true;
-			base->rally_point = p_position;
+			base->rally_component.has_rally_point = true;
+			base->rally_component.rally_point = p_position;
 		}
 		return true;
 	}
 
 	Barracks *building = find_barracks_by_id(p_selected_building_id);
 	if (building != nullptr) {
-		if (building->owner == p_owner) {
-			building->has_rally_point = true;
-			building->rally_point = p_position;
+		if (building->owner_component.owner == p_owner) {
+			building->rally_component.has_rally_point = true;
+			building->rally_component.rally_point = p_position;
 		}
 		return true;
 	}
@@ -74,7 +74,7 @@ CommandFeedback GameSimulation::command_selected_to(int32_t p_owner, const std::
 	bool attack_enemy_base = false;
 	BuildingId build_barracks_id = -1;
 	for (const Barracks &building : barracks) {
-		if (building.owner == p_owner && distance_to(p_position, building.position) <= BARRACKS_RADIUS + 18.0f) {
+		if (building.owner_component.owner == p_owner && distance_to(p_position, building.transform_component.position) <= BARRACKS_RADIUS + 18.0f) {
 			build_barracks_id = building.id;
 			break;
 		}
@@ -82,7 +82,7 @@ CommandFeedback GameSimulation::command_selected_to(int32_t p_owner, const std::
 	const BuildingId enemy_barracks_id = find_enemy_barracks_id_at(p_owner, p_position);
 	const int32_t enemy_unit_id = find_enemy_unit_id_at(p_owner, p_position);
 	Base *enemy_base = find_base(enemy_owner);
-	if (enemy_base != nullptr && distance_to(p_position, enemy_base->position) <= BASE_RADIUS + 24.0f) {
+	if (enemy_base != nullptr && distance_to(p_position, enemy_base->transform_component.position) <= BASE_RADIUS + 24.0f) {
 		attack_enemy_base = true;
 	}
 
@@ -91,7 +91,7 @@ CommandFeedback GameSimulation::command_selected_to(int32_t p_owner, const std::
 	int32_t selected_index = 0;
 	for (int32_t unit_id : p_selected_unit_ids) {
 		Unit *selected_unit = find_unit(unit_id);
-		if (selected_unit == nullptr || selected_unit->owner != p_owner) {
+		if (selected_unit == nullptr || selected_unit->owner_component.owner != p_owner) {
 			continue;
 		}
 		Unit &unit = *selected_unit;
@@ -100,41 +100,41 @@ CommandFeedback GameSimulation::command_selected_to(int32_t p_owner, const std::
 		selected_index++;
 
 		Barracks *build_barracks = find_barracks_by_id(build_barracks_id);
-		if (build_barracks != nullptr && unit.type == UnitType::WORKER && !build_barracks->completed) {
-			unit.gathering_resource = false;
-			unit.target_unit_id = -1;
-			unit.target_base_owner = -1;
-			unit.target_building_id = build_barracks_id;
-			unit.target_position = build_barracks->position;
+		if (build_barracks != nullptr && unit.type == UnitType::WORKER && !build_barracks->construction_component.completed) {
+			unit.gather_component.gathering_resource = false;
+			unit.combat_component.target_unit_id = -1;
+			unit.combat_component.target_base_owner = -1;
+			unit.build_component.target_building_id = build_barracks_id;
+			unit.movement_component.target_position = build_barracks->transform_component.position;
 			unit.order = UnitOrder::BUILD;
 		} else if (resource_id != -1 && unit.type == UnitType::WORKER) {
-			unit.gathering_resource = false;
-			unit.target_unit_id = -1;
-			unit.target_base_owner = -1;
-			unit.target_building_id = -1;
-			unit.target_resource = resource_id;
+			unit.gather_component.gathering_resource = false;
+			unit.combat_component.target_unit_id = -1;
+			unit.combat_component.target_base_owner = -1;
+			unit.build_component.target_building_id = -1;
+			unit.gather_component.target_resource = resource_id;
 			unit.order = UnitOrder::GATHER;
 		} else if (attack_enemy_base || enemy_barracks_id != -1 || enemy_unit_id != -1 || unit.type == UnitType::FIGHTER) {
-			unit.gathering_resource = false;
-			unit.target_unit_id = enemy_unit_id;
-			unit.target_building_id = enemy_barracks_id;
-			unit.target_base_owner = attack_enemy_base ? enemy_owner : -1;
+			unit.gather_component.gathering_resource = false;
+			unit.combat_component.target_unit_id = enemy_unit_id;
+			unit.combat_component.target_base_owner = attack_enemy_base ? enemy_owner : -1;
+			unit.combat_component.target_building_id = enemy_barracks_id;
 			if (enemy_barracks_id != -1) {
 				const Barracks *enemy_barracks = find_barracks_by_id(enemy_barracks_id);
-				unit.target_position = enemy_barracks != nullptr ? enemy_barracks->position + offset : p_position + offset;
+				unit.movement_component.target_position = enemy_barracks != nullptr ? enemy_barracks->transform_component.position + offset : p_position + offset;
 			} else if (enemy_unit_id != -1) {
 				Unit *enemy_unit = find_unit(enemy_unit_id);
-				unit.target_position = enemy_unit != nullptr ? enemy_unit->position + offset : p_position + offset;
+				unit.movement_component.target_position = enemy_unit != nullptr ? enemy_unit->transform_component.position + offset : p_position + offset;
 			} else {
-				unit.target_position = attack_enemy_base && enemy_base != nullptr ? enemy_base->position + offset : p_position + offset;
+				unit.movement_component.target_position = attack_enemy_base && enemy_base != nullptr ? enemy_base->transform_component.position + offset : p_position + offset;
 			}
 			unit.order = UnitOrder::ATTACK;
 		} else {
-			unit.gathering_resource = false;
-			unit.target_unit_id = -1;
-			unit.target_building_id = -1;
-			unit.target_base_owner = -1;
-			unit.target_position = p_position + offset;
+			unit.gather_component.gathering_resource = false;
+			unit.combat_component.target_unit_id = -1;
+			unit.build_component.target_building_id = -1;
+			unit.combat_component.target_base_owner = -1;
+			unit.movement_component.target_position = p_position + offset;
 			unit.order = UnitOrder::MOVE;
 		}
 	}

@@ -7,20 +7,26 @@
 namespace tinyv1 {
 
 void GameSimulation::remove_dead_units() {
-	units.erase(std::remove_if(units.begin(), units.end(), [](const Unit &unit) { return unit.hp <= 0.0f; }), units.end());
+	units.erase(std::remove_if(units.begin(), units.end(), [](const Unit &unit) { return unit.health_component.hp <= 0.0f; }), units.end());
 }
 
 void GameSimulation::remove_destroyed_barracks() {
 	for (int32_t i = static_cast<int32_t>(barracks.size()) - 1; i >= 0; --i) {
-		if (barracks[i].hp > 0.0f) {
+		if (barracks[i].health_component.hp > 0.0f) {
 			continue;
 		}
 
 		const BuildingId removed_id = barracks[i].id;
 		for (Unit &unit : units) {
-			if (unit.target_building_id == removed_id) {
-				unit.target_building_id = -1;
-				if (unit.order == UnitOrder::BUILD || unit.order == UnitOrder::ATTACK) {
+			if (unit.build_component.target_building_id == removed_id) {
+				unit.build_component.target_building_id = -1;
+				if (unit.order == UnitOrder::BUILD) {
+					unit.order = UnitOrder::IDLE;
+				}
+			}
+			if (unit.combat_component.target_building_id == removed_id) {
+				unit.combat_component.target_building_id = -1;
+				if (unit.order == UnitOrder::ATTACK) {
 					unit.order = UnitOrder::IDLE;
 				}
 			}
@@ -32,9 +38,9 @@ void GameSimulation::remove_destroyed_barracks() {
 void GameSimulation::check_win_condition() {
 	Base *player_base = find_base(PLAYER);
 	Base *bot_base = find_base(BOT);
-	if (player_base != nullptr && player_base->hp <= 0.0f) {
+	if (player_base != nullptr && player_base->health_component.hp <= 0.0f) {
 		winner_text = "Bot wins";
-	} else if (bot_base != nullptr && bot_base->hp <= 0.0f) {
+	} else if (bot_base != nullptr && bot_base->health_component.hp <= 0.0f) {
 		winner_text = "Player wins";
 	}
 }

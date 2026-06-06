@@ -48,7 +48,7 @@ void TinyGame::_ready() {
 }
 
 void TinyGame::_process(double p_delta) {
-	if (!winner_text.is_empty()) {
+	if (!sim.get_winner_text().is_empty()) {
 		queue_redraw();
 		return;
 	}
@@ -67,10 +67,11 @@ void TinyGame::_process(double p_delta) {
 }
 
 void TinyGame::_draw() {
+	const Rect2 map_rect = sim.get_map_rect();
 	draw_rect(map_rect, Color(0.18f, 0.45f, 0.18f), true);
 	draw_rect(map_rect, Color(0.08f, 0.28f, 0.09f), false, 3.0f);
 
-	for (const ResourceNode &resource : resources) {
+	for (const ResourceSummary &resource : sim.get_render_resources()) {
 		if (resource.amount <= 0) {
 			continue;
 		}
@@ -83,7 +84,7 @@ void TinyGame::_draw() {
 		}
 	}
 
-	for (const Base &base : bases) {
+	for (const BaseSummary &base : sim.get_render_bases()) {
 		const Color color = owner_color(base.owner);
 		if (base_texture.is_valid()) {
 			draw_texture_rect(base_texture, Rect2(base.position - Vector2(44, 38), Vector2(88, 76)), false);
@@ -92,8 +93,8 @@ void TinyGame::_draw() {
 			draw_rect(Rect2(base.position - Vector2(32, 24), Vector2(64, 48)), color, true);
 			draw_rect(Rect2(base.position - Vector2(34, 26), Vector2(68, 52)), Color(0.04f, 0.04f, 0.04f), false, 2.0f);
 		}
-		if (base.owner == local.selected_base_owner || base.hp < 400.0f) {
-			const float hp_ratio = std::max(0.0f, base.hp / 400.0f);
+		if (base.owner == local.selected_base_owner || base.hp < base.max_hp) {
+			const float hp_ratio = std::max(0.0f, base.hp / base.max_hp);
 			draw_rect(Rect2(base.position + Vector2(-36, -50), Vector2(72, 7)), Color(0.04f, 0.04f, 0.04f), true);
 			draw_rect(Rect2(base.position + Vector2(-36, -50), Vector2(72 * hp_ratio, 7)), Color(0.2f, 0.9f, 0.3f), true);
 		}
@@ -108,8 +109,7 @@ void TinyGame::_draw() {
 		}
 	}
 
-	for (int32_t i = 0; i < static_cast<int32_t>(barracks.size()); ++i) {
-		const Barracks &building = barracks[i];
+	for (const BuildingSummary &building : sim.get_render_buildings()) {
 		const Color color = owner_color(building.owner).darkened(0.1f);
 		const Color sprite_modulate = building.completed ? Color(1, 1, 1, 1) : Color(1, 1, 1, 0.45f);
 		if (barracks_texture.is_valid()) {
@@ -121,8 +121,8 @@ void TinyGame::_draw() {
 		if (!building.completed) {
 			draw_rect(Rect2(building.position - Vector2(36, 30), Vector2(72, 60)), Color(0.04f, 0.04f, 0.04f), false, 2.0f);
 		}
-		if (building.id == local.selected_building_id || building.hp < 250.0f) {
-			const float hp_ratio = std::max(0.0f, building.hp / 250.0f);
+		if (building.id == local.selected_building_id || building.hp < building.max_hp) {
+			const float hp_ratio = std::max(0.0f, building.hp / building.max_hp);
 			draw_rect(Rect2(building.position + Vector2(-36, -44), Vector2(72, 7)), Color(0.04f, 0.04f, 0.04f), true);
 			draw_rect(Rect2(building.position + Vector2(-36, -44), Vector2(72 * hp_ratio, 7)), Color(0.2f, 0.9f, 0.3f), true);
 		}
@@ -149,7 +149,7 @@ void TinyGame::_draw() {
 		draw_rect(Rect2(local.command_marker_position - Vector2(8, 8), Vector2(16, 16)), Color(0.25f, 0.0f, 0.0f, alpha), false, 2.0f);
 	}
 
-	for (const Unit &unit : units) {
+	for (const UnitSummary &unit : sim.get_render_units()) {
 		const float radius = unit_radius(unit);
 		Color color = owner_color(unit.owner);
 		if (unit.type == UnitType::WORKER) {
@@ -169,9 +169,8 @@ void TinyGame::_draw() {
 		if (unit.type == UnitType::FIGHTER && !unit_texture.is_valid()) {
 			draw_line(unit.position + Vector2(-radius, -radius), unit.position + Vector2(radius, radius), Color(0.05f, 0.05f, 0.05f), 3.0f);
 		}
-		const float max_hp = unit.type == UnitType::WORKER ? 45.0f : 80.0f;
-		if (local.is_unit_selected(unit.id) || unit.hp < max_hp) {
-			const float hp_ratio = std::max(0.0f, unit.hp / max_hp);
+		if (local.is_unit_selected(unit.id) || unit.hp < unit.max_hp) {
+			const float hp_ratio = std::max(0.0f, unit.hp / unit.max_hp);
 			const Vector2 hp_position = unit_texture.is_valid() ? unit_sprite_top_left(unit) + Vector2(0, -8) : unit.position + Vector2(-16, -30);
 			draw_rect(Rect2(hp_position, Vector2(32, 4)), Color(0.04f, 0.04f, 0.04f), true);
 			draw_rect(Rect2(hp_position, Vector2(32 * hp_ratio, 4)), Color(0.2f, 0.9f, 0.3f), true);
@@ -192,13 +191,13 @@ void TinyGame::_draw() {
 		draw_rect(Rect2(mouse_position - Vector2(36, 30), Vector2(72, 60)), Color(0.75f, 0.95f, 1.0f), false, 2.0f);
 	}
 
-	if (!winner_text.is_empty()) {
+	if (!sim.get_winner_text().is_empty()) {
 		draw_rect(Rect2(Vector2(390, 300), Vector2(500, 120)), Color(0.02f, 0.02f, 0.02f, 0.85f), true);
 	}
 }
 
 void TinyGame::_unhandled_input(const Ref<InputEvent> &p_event) {
-	if (!winner_text.is_empty()) {
+	if (!sim.get_winner_text().is_empty()) {
 		Ref<InputEventKey> key_event = p_event;
 		if (key_event.is_valid() && key_event->is_pressed() && !key_event->is_echo()) {
 			reset_match();
@@ -216,11 +215,11 @@ void TinyGame::_unhandled_input(const Ref<InputEvent> &p_event) {
 					command.type = GameCommandType::PLACE_BARRACKS;
 					command.owner = PLAYER;
 					command.position = mouse_position;
-					const Unit *builder = first_selected_unit();
-					command.builder_unit_id = builder == nullptr ? -1 : builder->id;
+					UnitSummary builder;
+					command.builder_unit_id = first_selected_unit_summary(builder) ? builder.id : -1;
 					const GameCommandResult result = sim.apply_command(command);
 					const int32_t building_id = result.placed_building_id;
-					if (player_essence < BARRACKS_COST || building_id != -1) {
+					if (sim.get_essence(PLAYER) < BARRACKS_COST || building_id != -1) {
 						local.is_placing_barracks = false;
 						if (building_id != -1) {
 							local.clear_selection();
@@ -231,19 +230,21 @@ void TinyGame::_unhandled_input(const Ref<InputEvent> &p_event) {
 					return;
 				}
 
-				Unit *unit_at_mouse = sim.find_player_unit_at(mouse_position);
-				if (mouse_event->is_double_click() && unit_at_mouse != nullptr) {
+				const UnitId unit_id_at_mouse = sim.find_player_unit_id_at(mouse_position);
+				UnitSummary unit_at_mouse;
+				const bool has_unit_at_mouse = sim.get_unit_summary(unit_id_at_mouse, unit_at_mouse);
+				if (mouse_event->is_double_click() && has_unit_at_mouse) {
 					local.is_drag_selecting = false;
 					local.drag_has_unit_type_filter = false;
-					local.set_selection(sim.select_all_units_of_type(PLAYER, unit_at_mouse->type));
+					local.set_selection(sim.select_all_units_of_type(PLAYER, unit_at_mouse.type));
 					queue_redraw();
 					return;
 				}
 
 				local.is_drag_selecting = true;
-				local.drag_has_unit_type_filter = unit_at_mouse != nullptr;
-				if (unit_at_mouse != nullptr) {
-					local.drag_unit_type_filter = unit_at_mouse->type;
+				local.drag_has_unit_type_filter = has_unit_at_mouse;
+				if (has_unit_at_mouse) {
+					local.drag_unit_type_filter = unit_at_mouse.type;
 				}
 				local.drag_start = mouse_position;
 				local.drag_current = mouse_position;
@@ -317,7 +318,7 @@ void TinyGame::_unhandled_input(const Ref<InputEvent> &p_event) {
 		command.owner = PLAYER;
 		command.unit_type = UnitType::WORKER;
 		sim.apply_command(command);
-	} else if (key_event->get_keycode() == Key::KEY_B && first_selected_unit() != nullptr && first_selected_unit()->type == UnitType::WORKER && player_essence >= BARRACKS_COST) {
+	} else if (key_event->get_keycode() == Key::KEY_B && !local.selected_unit_ids.empty() && sim.can_start_barracks_placement(PLAYER, local.selected_unit_ids.front())) {
 		local.is_placing_barracks = true;
 	}
 }
@@ -335,14 +336,14 @@ String TinyGame::get_status_text() const {
 	} else if (local.is_placing_barracks) {
 		selected_text += " | placing barracks: left click place, right click cancel";
 	}
-	if (!winner_text.is_empty()) {
-		return winner_text + String(" | press any key to restart");
+	if (!sim.get_winner_text().is_empty()) {
+		return sim.get_winner_text() + String(" | press any key to restart");
 	}
-	return "Gold " + String::num_int64(player_essence) + " | left click select | right click command" + selected_text;
+	return "Gold " + String::num_int64(sim.get_essence(PLAYER)) + " | left click select | right click command" + selected_text;
 }
 
 String TinyGame::get_resource_text() const {
-	return "Food: 0\nWood: 0\nGold: " + String::num_int64(player_essence);
+	return "Food: 0\nWood: 0\nGold: " + String::num_int64(sim.get_essence(PLAYER));
 }
 
 String TinyGame::get_selected_name() const {
@@ -351,18 +352,18 @@ String TinyGame::get_selected_name() const {
 		return "Unit Group (" + String::num_int64(count) + ")";
 	}
 
-	const Unit *unit = first_selected_unit();
-	if (unit != nullptr) {
-		return unit->type == UnitType::WORKER ? "Worker" : "Fighter";
+	UnitSummary unit;
+	if (first_selected_unit_summary(unit)) {
+		return unit.type == UnitType::WORKER ? "Worker" : "Fighter";
 	}
 
 	if (local.selected_base_owner == PLAYER) {
 		return "Main Base";
 	}
 
-	const Barracks *selected_building = selected_barracks();
-	if (selected_building != nullptr) {
-		if (!selected_building->completed) {
+	BuildingSummary selected_building;
+	if (selected_building_summary(selected_building)) {
+		if (!selected_building.completed) {
 			return "Barracks Site";
 		}
 		return "Barracks";
@@ -372,31 +373,31 @@ String TinyGame::get_selected_name() const {
 }
 
 String TinyGame::get_selected_actions_text() const {
-	const Unit *unit = first_selected_unit();
+	UnitSummary unit;
 	if (static_cast<int32_t>(local.selected_unit_ids.size()) > 0) {
-		if (unit != nullptr && unit->type == UnitType::WORKER) {
+		if (first_selected_unit_summary(unit) && unit.type == UnitType::WORKER) {
 			return "Right Click: Move / Gather\nBuild: Barracks";
 		}
 		return "Right Click: Attack-move\nRight Click Base: Attack";
 	}
 
 	if (local.selected_base_owner == PLAYER) {
-		Base *base = const_cast<TinyGame *>(this)->sim.find_base(PLAYER);
-		if (base != nullptr && base->training_worker) {
-			return "Training Worker: " + String::num_int64(static_cast<int64_t>((1.0f - base->train_timer / base->train_duration) * 100.0f)) + "%\nQueue: " + String::num_int64(base->worker_queue) + "/3";
+		BaseSummary base;
+		if (sim.get_base_summary(PLAYER, base) && base.training_worker) {
+			return "Training Worker: " + String::num_int64(static_cast<int64_t>((1.0f - base.train_timer / base.train_duration) * 100.0f)) + "%\nQueue: " + String::num_int64(base.worker_queue) + "/3";
 		}
-		return "W: Train Worker (20 Gold)\nRight Click: Set rally point\nQueue: " + String::num_int64(base == nullptr ? 0 : base->worker_queue) + "/3";
+		return "W: Train Worker (20 Gold)\nRight Click: Set rally point\nQueue: " + String::num_int64(base.worker_queue) + "/3";
 	}
 
-	const Barracks *selected_building = selected_barracks();
-	if (selected_building != nullptr) {
-		if (!selected_building->completed) {
+	BuildingSummary selected_building;
+	if (selected_building_summary(selected_building)) {
+		if (!selected_building.completed) {
 			return "Under construction\nDel: Cancel refund";
 		}
-		if (selected_building->training_fighter) {
-			return "Training Fighter: " + String::num_int64(static_cast<int64_t>((1.0f - selected_building->train_timer / selected_building->train_duration) * 100.0f)) + "%\nQueue: " + String::num_int64(selected_building->fighter_queue) + "/3";
+		if (selected_building.training_fighter) {
+			return "Training Fighter: " + String::num_int64(static_cast<int64_t>((1.0f - selected_building.train_timer / selected_building.train_duration) * 100.0f)) + "%\nQueue: " + String::num_int64(selected_building.fighter_queue) + "/3";
 		}
-		return "F: Train Fighter (25 Gold)\nRight Click: Set rally point\nQueue: " + String::num_int64(selected_building->fighter_queue) + "/3";
+		return "F: Train Fighter (25 Gold)\nRight Click: Set rally point\nQueue: " + String::num_int64(selected_building.fighter_queue) + "/3";
 	}
 
 	return "Select a unit or building.";
@@ -407,8 +408,9 @@ String TinyGame::get_selected_details_text() const {
 	if (count > 1) {
 		int32_t workers = 0;
 		int32_t fighters = 0;
-		for (const Unit &unit : units) {
-			if (!local.is_unit_selected(unit.id)) {
+		for (UnitId unit_id : local.selected_unit_ids) {
+			UnitSummary unit;
+			if (!sim.get_unit_summary(unit_id, unit)) {
 				continue;
 			}
 			if (unit.type == UnitType::WORKER) {
@@ -420,42 +422,42 @@ String TinyGame::get_selected_details_text() const {
 		return "Selected group\nWorkers: " + String::num_int64(workers) + "\nFighters: " + String::num_int64(fighters);
 	}
 
-	const Unit *unit = first_selected_unit();
-	if (unit != nullptr) {
-		String role = unit->type == UnitType::WORKER ? "Gathers Gold and builds Barracks." : "Basic melee combat unit.";
-		return "HP: " + String::num_int64(static_cast<int64_t>(unit->hp)) + "\n" + role;
+	UnitSummary unit;
+	if (first_selected_unit_summary(unit)) {
+		String role = unit.type == UnitType::WORKER ? "Gathers Gold and builds Barracks." : "Basic melee combat unit.";
+		return "HP: " + String::num_int64(static_cast<int64_t>(unit.hp)) + "\n" + role;
 	}
 
 	if (local.selected_base_owner == PLAYER) {
-		Base *base = const_cast<TinyGame *>(this)->sim.find_base(PLAYER);
-		const int64_t hp = base == nullptr ? 0 : static_cast<int64_t>(base->hp);
-		if (base != nullptr && base->training_worker) {
-			return "HP: " + String::num_int64(hp) + "\nTraining Worker\nQueue: " + String::num_int64(base->worker_queue) + "/3";
+		BaseSummary base;
+		const int64_t hp = sim.get_base_summary(PLAYER, base) ? static_cast<int64_t>(base.hp) : 0;
+		if (base.training_worker) {
+			return "HP: " + String::num_int64(hp) + "\nTraining Worker\nQueue: " + String::num_int64(base.worker_queue) + "/3";
 		}
 		return "HP: " + String::num_int64(hp) + "\nTrains workers.";
 	}
 
-	const Barracks *selected_building = selected_barracks();
-	if (selected_building != nullptr) {
-		if (!selected_building->completed) {
-			return "Progress: " + String::num_int64(static_cast<int64_t>(selected_building->build_progress * 100.0f)) + "%\nNeeds worker construction.";
+	BuildingSummary selected_building;
+	if (selected_building_summary(selected_building)) {
+		if (!selected_building.completed) {
+			return "Progress: " + String::num_int64(static_cast<int64_t>(selected_building.build_progress * 100.0f)) + "%\nNeeds worker construction.";
 		}
-		if (selected_building->training_fighter) {
-			return "HP: " + String::num_int64(static_cast<int64_t>(selected_building->hp)) + "\nTraining Fighter\nQueue: " + String::num_int64(selected_building->fighter_queue) + "/3";
+		if (selected_building.training_fighter) {
+			return "HP: " + String::num_int64(static_cast<int64_t>(selected_building.hp)) + "\nTraining Fighter\nQueue: " + String::num_int64(selected_building.fighter_queue) + "/3";
 		}
-		return "HP: " + String::num_int64(static_cast<int64_t>(selected_building->hp)) + "\nTrains fighters.";
+		return "HP: " + String::num_int64(static_cast<int64_t>(selected_building.hp)) + "\nTrains fighters.";
 	}
 
 	return "No unit selected.\nSelect workers, fighters, or your base.";
 }
 
 Color TinyGame::get_selected_portrait_color() const {
-	const Unit *unit = first_selected_unit();
+	UnitSummary unit;
 	if (static_cast<int32_t>(local.selected_unit_ids.size()) > 1) {
 		return Color(0.35f, 0.55f, 0.95f);
 	}
-	if (unit != nullptr) {
-		return unit->type == UnitType::WORKER ? Color(0.55f, 0.78f, 1.0f) : Color(0.25f, 0.55f, 1.0f);
+	if (first_selected_unit_summary(unit)) {
+		return unit.type == UnitType::WORKER ? Color(0.55f, 0.78f, 1.0f) : Color(0.25f, 0.55f, 1.0f);
 	}
 	if (local.selected_base_owner == PLAYER) {
 		return Color(0.15f, 0.35f, 0.85f);
@@ -467,9 +469,9 @@ Color TinyGame::get_selected_portrait_color() const {
 }
 
 String TinyGame::get_selected_portrait_path() const {
-	const Unit *unit = first_selected_unit();
-	if (unit != nullptr) {
-		return unit->type == UnitType::WORKER ? "res://assets/units/greece/worker/worker_face.png" : "res://assets/units/greece/hoplite/hoplite_face.png";
+	UnitSummary unit;
+	if (first_selected_unit_summary(unit)) {
+		return unit.type == UnitType::WORKER ? "res://assets/units/greece/worker/worker_face.png" : "res://assets/units/greece/hoplite/hoplite_face.png";
 	}
 
 	if (local.selected_base_owner == PLAYER) {
@@ -486,28 +488,28 @@ String TinyGame::get_selected_portrait_path() const {
 String TinyGame::get_action_button_text(int32_t p_index) const {
 	if (local.selected_base_owner == PLAYER) {
 		if (p_index == 0) {
-			Base *base = const_cast<TinyGame *>(this)->sim.find_base(PLAYER);
-			if (base != nullptr && base->training_worker) {
-				return "Queue " + String::num_int64(base->worker_queue) + "/3";
+			BaseSummary base;
+			if (sim.get_base_summary(PLAYER, base) && base.training_worker) {
+				return "Queue " + String::num_int64(base.worker_queue) + "/3";
 			}
 			return "20 Gold";
 		}
 	}
 
-	const Barracks *selected_building = selected_barracks();
-	if (selected_building != nullptr && p_index == 0) {
-		if (!selected_building->completed) {
+	BuildingSummary selected_building;
+	if (selected_building_summary(selected_building) && p_index == 0) {
+		if (!selected_building.completed) {
 			return "Building...";
 		}
-		if (selected_building->training_fighter) {
-			return "Queue " + String::num_int64(selected_building->fighter_queue) + "/3";
+		if (selected_building.training_fighter) {
+			return "Queue " + String::num_int64(selected_building.fighter_queue) + "/3";
 		}
 		return "25 Gold";
 	}
 
-	const Unit *unit = first_selected_unit();
-	if (unit != nullptr) {
-		if (unit->type == UnitType::WORKER) {
+	UnitSummary unit;
+	if (first_selected_unit_summary(unit)) {
+		if (unit.type == UnitType::WORKER) {
 			return p_index == 0 ? "80 Gold" : "";
 		}
 		return p_index == 0 ? "Attack" : "Hold";
@@ -525,8 +527,8 @@ String TinyGame::get_action_button_icon_path(int32_t p_index) const {
 		return "res://assets/units/greece/hoplite/hoplite_face.png";
 	}
 
-	const Unit *unit = first_selected_unit();
-	if (unit != nullptr && unit->type == UnitType::WORKER && p_index == 0) {
+	UnitSummary unit;
+	if (first_selected_unit_summary(unit) && unit.type == UnitType::WORKER && p_index == 0) {
 		return "res://assets/units/greece/barracks/barracks_face.png";
 	}
 
@@ -536,19 +538,18 @@ String TinyGame::get_action_button_icon_path(int32_t p_index) const {
 bool TinyGame::is_action_button_enabled(int32_t p_index) const {
 	if (local.selected_base_owner == PLAYER) {
 		if (p_index == 0) {
-			Base *base = const_cast<TinyGame *>(this)->sim.find_base(PLAYER);
-			return base != nullptr && base->worker_queue < MAX_TRAIN_QUEUE && player_essence >= WORKER_COST;
+			return sim.can_train_worker(PLAYER);
 		}
 	}
 
-	const Barracks *selected_building = selected_barracks();
-	if (selected_building != nullptr && p_index == 0) {
-		return selected_building->completed && selected_building->fighter_queue < MAX_TRAIN_QUEUE && player_essence >= FIGHTER_COST;
+	BuildingSummary selected_building;
+	if (selected_building_summary(selected_building) && p_index == 0) {
+		return sim.can_train_fighter(PLAYER, selected_building.id);
 	}
 
-	const Unit *unit = first_selected_unit();
-	if (unit != nullptr && unit->type == UnitType::WORKER && p_index == 0) {
-		return player_essence >= BARRACKS_COST;
+	UnitSummary unit;
+	if (first_selected_unit_summary(unit) && unit.type == UnitType::WORKER && p_index == 0) {
+		return sim.can_start_barracks_placement(PLAYER, unit.id);
 	}
 
 	return false;
@@ -568,8 +569,11 @@ void TinyGame::perform_action_button(int32_t p_index) {
 		command.unit_type = UnitType::FIGHTER;
 		command.selected_building_id = local.selected_building_id;
 		sim.apply_command(command);
-	} else if (first_selected_unit() != nullptr && first_selected_unit()->type == UnitType::WORKER && p_index == 0 && player_essence >= BARRACKS_COST) {
-		local.is_placing_barracks = true;
+	} else {
+		UnitSummary unit;
+		if (first_selected_unit_summary(unit) && unit.type == UnitType::WORKER && p_index == 0 && sim.can_start_barracks_placement(PLAYER, unit.id)) {
+			local.is_placing_barracks = true;
+		}
 	}
 }
 
@@ -598,29 +602,28 @@ void TinyGame::load_textures() {
 	goldmine_texture = load_image_texture("res://assets/world/gold/gold.png");
 }
 
-const Unit *TinyGame::first_selected_unit() const {
+bool TinyGame::first_selected_unit_summary(UnitSummary &r_summary) const {
 	for (int32_t unit_id : local.selected_unit_ids) {
-		const Unit *unit = const_cast<TinyGame *>(this)->sim.find_unit(unit_id);
-		if (unit != nullptr) {
-			return unit;
+		if (sim.get_unit_summary(unit_id, r_summary)) {
+			return true;
 		}
 	}
-	return nullptr;
+	return false;
 }
 
-const Barracks *TinyGame::selected_barracks() const {
-	return sim.find_barracks_by_id(local.selected_building_id);
+bool TinyGame::selected_building_summary(BuildingSummary &r_summary) const {
+	return sim.get_building_summary(local.selected_building_id, r_summary);
 }
 
-float TinyGame::unit_radius(const Unit &p_unit) const {
+float TinyGame::unit_radius(const UnitSummary &p_unit) const {
 	return p_unit.type == UnitType::WORKER ? 12.0f : 16.0f;
 }
 
-Vector2 TinyGame::unit_sprite_size(const Unit &p_unit) const {
+Vector2 TinyGame::unit_sprite_size(const UnitSummary &p_unit) const {
 	return p_unit.type == UnitType::WORKER ? Vector2(32, 32) : Vector2(40, 40);
 }
 
-Vector2 TinyGame::unit_sprite_top_left(const Unit &p_unit) const {
+Vector2 TinyGame::unit_sprite_top_left(const UnitSummary &p_unit) const {
 	const Vector2 size = unit_sprite_size(p_unit);
 	return p_unit.position - Vector2(size.x * 0.5f, size.y - 6.0f);
 }
