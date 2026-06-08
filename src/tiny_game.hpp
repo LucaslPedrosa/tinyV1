@@ -9,6 +9,7 @@
 #include <godot_cpp/classes/input_event.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/variant/color.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/string.hpp>
 
 namespace tinyv1 {
@@ -45,6 +46,7 @@ public:
 	godot::String get_action_button_text(int32_t p_index) const;
 	godot::String get_action_button_icon_path(int32_t p_index) const;
 	bool is_action_button_enabled(int32_t p_index) const;
+	godot::Dictionary get_hud_snapshot() const;
 	void perform_action_button(int32_t p_index);
 
 private:

@@ -33,9 +33,10 @@ void TinyGame::_bind_methods()
   ClassDB::bind_method(D_METHOD("get_action_button_icon_path", "index"),
                        &TinyGame::get_action_button_icon_path);
   ClassDB::bind_method(D_METHOD("is_action_button_enabled", "index"),
-                       &TinyGame::is_action_button_enabled);
+                        &TinyGame::is_action_button_enabled);
+  ClassDB::bind_method(D_METHOD("get_hud_snapshot"), &TinyGame::get_hud_snapshot);
   ClassDB::bind_method(D_METHOD("perform_action_button", "index"),
-                       &TinyGame::perform_action_button);
+                        &TinyGame::perform_action_button);
 }
 
 void TinyGame::_ready()
@@ -58,7 +59,6 @@ void TinyGame::_process(double p_delta)
   animation_time += static_cast<float>(p_delta);
   if (!sim.get_winner_text().is_empty())
   {
-    queue_redraw();
     return;
   }
 
@@ -153,6 +153,29 @@ String TinyGame::get_action_button_icon_path(int32_t p_index) const
 bool TinyGame::is_action_button_enabled(int32_t p_index) const
 {
   return HudPresenter::is_action_button_enabled(sim, local, p_index);
+}
+
+Dictionary TinyGame::get_hud_snapshot() const
+{
+  Dictionary snapshot;
+  snapshot["resource_text"] = HudPresenter::get_resource_text(sim);
+  snapshot["selected_actions_text"] = HudPresenter::get_selected_actions_text(sim, local);
+  snapshot["selected_name"] = HudPresenter::get_selected_name(sim, local);
+  snapshot["selected_details_text"] = HudPresenter::get_selected_details_text(sim, local);
+  snapshot["selected_portrait_path"] = HudPresenter::get_selected_portrait_path(sim, local);
+
+  for (int32_t index = 0; index < 2; ++index)
+  {
+    const String suffix = String::num_int64(index);
+    snapshot[String("action_button_") + suffix + "_text"] =
+        HudPresenter::get_action_button_text(sim, local, index);
+    snapshot[String("action_button_") + suffix + "_icon_path"] =
+        HudPresenter::get_action_button_icon_path(sim, local, index);
+    snapshot[String("action_button_") + suffix + "_enabled"] =
+        HudPresenter::is_action_button_enabled(sim, local, index);
+  }
+
+  return snapshot;
 }
 
 void TinyGame::perform_action_button(int32_t p_index)

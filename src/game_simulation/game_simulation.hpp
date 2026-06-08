@@ -19,10 +19,7 @@ public:
 	const godot::Rect2 &get_map_rect() const;
 	const godot::String &get_winner_text() const;
 	int32_t get_essence(PlayerId p_owner) const;
-	std::vector<ResourceSummary> get_render_resources() const;
-	std::vector<BaseSummary> get_render_bases() const;
-	std::vector<BuildingSummary> get_render_buildings() const;
-	std::vector<UnitSummary> get_render_units() const;
+	void build_render_snapshot(RenderSnapshot &r_snapshot) const;
 	int32_t count_units(PlayerId p_owner, UnitType p_type) const;
 	std::vector<UnitId> get_unit_ids(PlayerId p_owner, UnitType p_type) const;
 	std::vector<UnitId> get_idle_worker_ids(PlayerId p_owner) const;

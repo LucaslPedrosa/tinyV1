@@ -40,9 +40,7 @@ Vector2 pixel_snap(const Vector2 &p_position)
 
 bool GreeceRenderer::HumanoidTextures::has_body() const
 {
-  return std::all_of(body_parts.begin(), body_parts.end(), [](const Ref<Texture2D> &p_texture) {
-    return p_texture.is_valid();
-  });
+  return body_ready;
 }
 
 void GreeceRenderer::load_textures()
@@ -61,9 +59,14 @@ void GreeceRenderer::load_textures()
 void GreeceRenderer::load_humanoid_textures(const char *p_unit_folder,
                                             HumanoidTextures &r_textures) const
 {
+  r_textures.body_ready = true;
   for (size_t i = 0; i < asset_contracts::HUMANOID_PART_FILES.size(); ++i)
   {
     r_textures.body_parts[i] = load_texture(asset_contracts::humanoid_part(p_unit_folder, i));
+    if (!r_textures.body_parts[i].is_valid())
+    {
+      r_textures.body_ready = false;
+    }
   }
 }
 

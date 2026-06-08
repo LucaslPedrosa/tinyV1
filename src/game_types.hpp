@@ -205,4 +205,11 @@ struct SelectionResult {
 	BuildingId building_id = -1;
 };
 
+struct RenderSnapshot {
+	std::vector<ResourceSummary> resources;
+	std::vector<BaseSummary> bases;
+	std::vector<BuildingSummary> buildings;
+	std::vector<UnitSummary> units;
+};
+
 } // namespace tinyv1

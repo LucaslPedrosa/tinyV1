@@ -55,6 +55,7 @@ class GreeceRenderer {
     std::array<godot::Ref<godot::Texture2D>, 8> body_parts;
     godot::Ref<godot::Texture2D> right_hand_item;
     godot::Ref<godot::Texture2D> left_hand_item;
+    bool body_ready = false;
 
     bool has_body() const;
   };

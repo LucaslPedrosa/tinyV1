@@ -3,15 +3,14 @@
 #include "game_constants.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace tinyv1 {
 
 namespace {
 
 constexpr float STATIC_OBSTACLE_MARGIN = 6.0f;
-constexpr float UNIT_SEPARATION_RADIUS = 8.0f;
 constexpr float STATIC_AVOIDANCE_WEIGHT = 1.6f;
-constexpr float UNIT_AVOIDANCE_WEIGHT = 1.1f;
 
 const GatherRule *find_gather_rule(const GatherComponent &p_gather_component, ResourceType p_resource_type) {
 	for (const GatherRule &rule : p_gather_component.rules) {
@@ -35,14 +34,15 @@ float unit_collision_radius(const Unit &p_unit) {
 
 godot::Vector2 avoidance_from_circle(const godot::Vector2 &p_position, const godot::Vector2 &p_obstacle_position, float p_avoid_radius) {
 	const godot::Vector2 away = p_position - p_obstacle_position;
-	const float distance = away.length();
-	if (distance <= 0.001f) {
+	const float distance_squared = away.x * away.x + away.y * away.y;
+	if (distance_squared <= 0.000001f) {
 		return godot::Vector2(1.0f, 0.0f);
 	}
-	if (distance >= p_avoid_radius) {
+	if (distance_squared >= p_avoid_radius * p_avoid_radius) {
 		return godot::Vector2();
 	}
 
+	const float distance = std::sqrt(distance_squared);
 	const float strength = (p_avoid_radius - distance) / p_avoid_radius;
 	return away / distance * strength;
 }
@@ -92,14 +92,6 @@ void GameSimulation::move_unit_toward_with_avoidance(Unit &p_unit, const godot::
 			continue;
 		}
 		avoidance += avoidance_from_circle(position, building.transform_component.position, BARRACKS_RADIUS + unit_radius_value + STATIC_OBSTACLE_MARGIN) * STATIC_AVOIDANCE_WEIGHT;
-	}
-
-	for (const Unit &other : units) {
-		if (other.object.id == p_unit.object.id || other.object.health_component.hp <= 0.0f) {
-			continue;
-		}
-		const float avoid_radius = unit_radius_value + unit_collision_radius(other) + UNIT_SEPARATION_RADIUS;
-		avoidance += avoidance_from_circle(position, other.object.transform_component.position, avoid_radius) * UNIT_AVOIDANCE_WEIGHT;
 	}
 
 	godot::Vector2 final_direction = safe_normalized(desired + avoidance);

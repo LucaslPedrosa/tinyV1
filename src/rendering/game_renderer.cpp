@@ -17,8 +17,7 @@ using namespace godot;
 namespace tinyv1
 {
 
-namespace
-{
+namespace {
 
 Vector2 pixel_snap(const Vector2 &p_position)
 {
@@ -26,6 +25,14 @@ Vector2 pixel_snap(const Vector2 &p_position)
 }
 
 } // namespace
+
+GameRenderer::GameRenderer()
+{
+  render_snapshot.resources.reserve(8);
+  render_snapshot.bases.reserve(4);
+  render_snapshot.buildings.reserve(4);
+  render_snapshot.units.reserve(32);
+}
 
 void GameRenderer::load_textures()
 {
@@ -36,11 +43,13 @@ void GameRenderer::load_textures()
 void GameRenderer::draw(Node2D &p_canvas, const GameSimulation &p_simulation,
                         const LocalPlayerState &p_local, float p_animation_time) const
 {
+  p_simulation.build_render_snapshot(render_snapshot);
+
   const Rect2 map_rect = p_simulation.get_map_rect();
   p_canvas.draw_rect(map_rect, Color(0.18f, 0.45f, 0.18f), true);
   p_canvas.draw_rect(map_rect, Color(0.08f, 0.28f, 0.09f), false, 3.0f);
 
-  for (const ResourceSummary &resource : p_simulation.get_render_resources())
+  for (const ResourceSummary &resource : render_snapshot.resources)
   {
     if (resource.amount <= 0)
     {
@@ -64,7 +73,7 @@ void GameRenderer::draw(Node2D &p_canvas, const GameSimulation &p_simulation,
     }
   }
 
-  for (const BaseSummary &base : p_simulation.get_render_bases())
+  for (const BaseSummary &base : render_snapshot.bases)
   {
     greece_renderer.draw_base(p_canvas, base);
     if (base.owner == p_local.selected_base_owner || base.hp < base.max_hp)
@@ -91,7 +100,7 @@ void GameRenderer::draw(Node2D &p_canvas, const GameSimulation &p_simulation,
     }
   }
 
-  for (const BuildingSummary &building : p_simulation.get_render_buildings())
+  for (const BuildingSummary &building : render_snapshot.buildings)
   {
     greece_renderer.draw_barracks(p_canvas, building);
     if (!building.completed)
@@ -147,11 +156,12 @@ void GameRenderer::draw(Node2D &p_canvas, const GameSimulation &p_simulation,
                        Color(0.25f, 0.0f, 0.0f, alpha), false, 2.0f);
   }
 
-  for (const UnitSummary &unit : p_simulation.get_render_units())
+  for (const UnitSummary &unit : render_snapshot.units)
   {
     const float radius = greece_renderer.unit_radius(unit);
+    const bool selected = p_local.is_unit_selected(unit.id);
 
-    if (p_local.is_unit_selected(unit.id))
+    if (selected)
     {
       p_canvas.draw_arc(unit.position + Vector2(0, render_constants::SELECTED_UNIT_RING_Y_OFFSET),
                         radius + render_constants::SELECTED_UNIT_RING_PADDING, 0.0f, Math_TAU,
@@ -159,7 +169,7 @@ void GameRenderer::draw(Node2D &p_canvas, const GameSimulation &p_simulation,
     }
 
     greece_renderer.draw_unit(p_canvas, unit, p_animation_time);
-    if (p_local.is_unit_selected(unit.id) || unit.hp < unit.max_hp)
+    if (selected || unit.hp < unit.max_hp)
     {
       const float hp_ratio = std::max(0.0f, unit.hp / unit.max_hp);
       const Vector2 hp_position =

@@ -2,15 +2,17 @@ extends Node2D
 
 const MAP_RECT := Rect2(Vector2.ZERO, Vector2(3200.0, 2200.0))
 const CAMERA_START := Vector2(780.0, 1100.0)
-const CAMERA_ZOOM_LEVELS: Array[float] = [-1.0, -0.5, 0.1, 0.5, 0.667, 1.0, 1.5, 2.0]
+const CAMERA_ZOOM_LEVELS: Array[float] = [0.5, 1.0, 2.0]
 const CAMERA_WHEEL_ZOOM_STEP := 1
-const CAMERA_START_ZOOM_INDEX := 4
+const CAMERA_START_ZOOM_INDEX := 1
 const CAMERA_EDGE_MARGIN := 40.0
 const CAMERA_EDGE_SPEED := 620.0
+const HUD_UPDATE_INTERVAL := 0.1
 
 var game: Node
 var game_camera: Camera2D
 var camera_zoom_index := CAMERA_START_ZOOM_INDEX
+var hud_update_timer := 0.0
 var portrait_cache: Dictionary[String, Texture2D] = {}
 var icon_cache: Dictionary[String, Texture2D] = {}
 
@@ -19,6 +21,10 @@ var icon_cache: Dictionary[String, Texture2D] = {}
 @onready var actions_label: Label = $HudLayer/BottomHud/ActionsBox/ActionsLabel
 @onready var action_button_0: Button = $HudLayer/BottomHud/ActionsBox/ActionButton0
 @onready var action_button_1: Button = $HudLayer/BottomHud/ActionsBox/ActionButton1
+@onready var action_button_0_text: Label = $HudLayer/BottomHud/ActionsBox/ActionButton0/Text
+@onready var action_button_1_text: Label = $HudLayer/BottomHud/ActionsBox/ActionButton1/Text
+@onready var action_button_0_icon: TextureRect = $HudLayer/BottomHud/ActionsBox/ActionButton0/Icon
+@onready var action_button_1_icon: TextureRect = $HudLayer/BottomHud/ActionsBox/ActionButton1/Icon
 @onready var portrait: TextureRect = $HudLayer/BottomHud/SelectionBox/Portrait
 @onready var name_label: Label = $HudLayer/BottomHud/SelectionBox/NameLabel
 @onready var details_label: Label = $HudLayer/BottomHud/SelectionBox/DetailsLabel
@@ -50,7 +56,10 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	_update_camera(_delta)
 	if game != null:
-		_update_hud()
+		hud_update_timer -= _delta
+		if hud_update_timer <= 0.0:
+			hud_update_timer = HUD_UPDATE_INTERVAL
+			_update_hud()
 
 
 func _setup_camera() -> void:
@@ -79,14 +88,17 @@ func _input(event: InputEvent) -> void:
 		_change_camera_zoom(-CAMERA_WHEEL_ZOOM_STEP)
 		get_viewport().set_input_as_handled()
 
+
 func _change_camera_zoom(direction: int) -> void:
 	_set_camera_zoom_by_index(camera_zoom_index + direction)
+
 
 func _set_camera_zoom_by_index(index: int) -> void:
 	camera_zoom_index = clampi(index, 0, CAMERA_ZOOM_LEVELS.size() - 1)
 	var zoom := CAMERA_ZOOM_LEVELS[camera_zoom_index]
 	game_camera.zoom = Vector2(zoom, zoom)
 	game_camera.position = _clamp_camera_position(game_camera.position, get_viewport_rect().size)
+
 
 func _update_camera(delta: float) -> void:
 	if game_camera == null:
@@ -143,18 +155,25 @@ func _snap_camera_position(position: Vector2) -> Vector2:
 
 
 func _update_hud() -> void:
-	resources_label.text = game.call("get_resource_text") as String
-	actions_label.text = game.call("get_selected_actions_text") as String
-	name_label.text = game.call("get_selected_name") as String
-	details_label.text = game.call("get_selected_details_text") as String
-	_update_portrait(game.call("get_selected_portrait_path") as String)
-	_update_action_button(action_button_0, 0)
-	_update_action_button(action_button_1, 1)
+	var hud := game.call("get_hud_snapshot") as Dictionary
+	_set_label_text(resources_label, hud.get("resource_text", "") as String)
+	_set_label_text(actions_label, hud.get("selected_actions_text", "") as String)
+	_set_label_text(name_label, hud.get("selected_name", "") as String)
+	_set_label_text(details_label, hud.get("selected_details_text", "") as String)
+	_update_portrait(hud.get("selected_portrait_path", "") as String)
+	_update_action_button(action_button_0, action_button_0_text, action_button_0_icon, hud, 0)
+	_update_action_button(action_button_1, action_button_1_text, action_button_1_icon, hud, 1)
+
+
+func _set_label_text(label: Label, value: String) -> void:
+	if label.text != value:
+		label.text = value
 
 
 func _update_portrait(path: String) -> void:
 	if path.is_empty():
-		portrait.texture = null
+		if portrait.texture != null:
+			portrait.texture = null
 		return
 
 	if not portrait_cache.has(path):
@@ -164,17 +183,24 @@ func _update_portrait(path: String) -> void:
 			return
 		portrait_cache[path] = texture
 
-	portrait.texture = portrait_cache[path]
+	if portrait.texture != portrait_cache[path]:
+		portrait.texture = portrait_cache[path]
 
 
-func _update_action_button(button: Button, index: int) -> void:
-	var text_label: Label = button.get_node("Text") as Label
-	var icon_rect: TextureRect = button.get_node("Icon") as TextureRect
-	text_label.text = game.call("get_action_button_text", index) as String
-	icon_rect.texture = _load_icon(game.call("get_action_button_icon_path", index) as String)
-	button.text = ""
-	button.disabled = not (game.call("is_action_button_enabled", index) as bool)
-	button.visible = not text_label.text.is_empty() or icon_rect.texture != null
+func _update_action_button(button: Button, text_label: Label, icon_rect: TextureRect, hud: Dictionary, index: int) -> void:
+	var prefix := "action_button_%d" % index
+	_set_label_text(text_label, hud.get(prefix + "_text", "") as String)
+	var icon := _load_icon(hud.get(prefix + "_icon_path", "") as String)
+	if icon_rect.texture != icon:
+		icon_rect.texture = icon
+	if not button.text.is_empty():
+		button.text = ""
+	var disabled := not (hud.get(prefix + "_enabled", false) as bool)
+	if button.disabled != disabled:
+		button.disabled = disabled
+	var visible := not text_label.text.is_empty() or icon_rect.texture != null
+	if button.visible != visible:
+		button.visible = visible
 
 
 func _load_icon(path: String) -> Texture2D:
@@ -206,4 +232,5 @@ func _on_action_button_pressed(index: int) -> void:
 	if game == null:
 		return
 	game.call("perform_action_button", index)
+	hud_update_timer = HUD_UPDATE_INTERVAL
 	_update_hud()

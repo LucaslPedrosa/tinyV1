@@ -154,16 +154,18 @@ int32_t GameSimulation::get_essence(PlayerId p_owner) const {
 	return p_owner == PLAYER ? player_essence : bot_essence;
 }
 
-std::vector<ResourceSummary> GameSimulation::get_render_resources() const {
-	std::vector<ResourceSummary> result;
-	for (const ResourceNode &resource : resources) {
-		result.push_back({ resource.id, resource.position, resource.amount });
-	}
-	return result;
-}
+void GameSimulation::build_render_snapshot(RenderSnapshot &r_snapshot) const {
+	r_snapshot.resources.clear();
+	r_snapshot.bases.clear();
+	r_snapshot.buildings.clear();
+	r_snapshot.units.clear();
 
-std::vector<BaseSummary> GameSimulation::get_render_bases() const {
-	std::vector<BaseSummary> result;
+	r_snapshot.resources.reserve(resources.size());
+	for (const ResourceNode &resource : resources) {
+		r_snapshot.resources.push_back({ resource.id, resource.position, resource.amount });
+	}
+
+	r_snapshot.bases.reserve(bases.size());
 	for (const Base &base : bases) {
 		BaseSummary summary;
 		summary.owner = base.owner_component.owner;
@@ -176,13 +178,10 @@ std::vector<BaseSummary> GameSimulation::get_render_bases() const {
 		summary.worker_queue = base.production_component.queue;
 		summary.has_rally_point = base.rally_component.has_rally_action;
 		summary.rally_point = base.rally_component.position;
-		result.push_back(summary);
+		r_snapshot.bases.push_back(summary);
 	}
-	return result;
-}
 
-std::vector<BuildingSummary> GameSimulation::get_render_buildings() const {
-	std::vector<BuildingSummary> result;
+	r_snapshot.buildings.reserve(barracks.size());
 	for (const Barracks &building : barracks) {
 		BuildingSummary summary;
 		summary.id = building.id;
@@ -198,13 +197,10 @@ std::vector<BuildingSummary> GameSimulation::get_render_buildings() const {
 		summary.fighter_queue = building.production_component.queue;
 		summary.has_rally_point = building.rally_component.has_rally_action;
 		summary.rally_point = building.rally_component.position;
-		result.push_back(summary);
+		r_snapshot.buildings.push_back(summary);
 	}
-	return result;
-}
 
-std::vector<UnitSummary> GameSimulation::get_render_units() const {
-	std::vector<UnitSummary> result;
+	r_snapshot.units.reserve(units.size());
 	for (const Unit &unit : units) {
 		UnitSummary summary;
 		summary.id = unit.object.id;
@@ -215,9 +211,8 @@ std::vector<UnitSummary> GameSimulation::get_render_units() const {
 		summary.hp = unit.object.health_component.hp;
 		summary.max_hp = unit.type == UnitType::WORKER ? 45.0f : 80.0f;
 		summary.moving = unit.order == UnitOrder::MOVE || unit.order == UnitOrder::RETURN || unit.order == UnitOrder::ATTACK || unit.order == UnitOrder::BUILD || (unit.order == UnitOrder::GATHER && !unit.gather_component.gathering_resource);
-		result.push_back(summary);
+		r_snapshot.units.push_back(summary);
 	}
-	return result;
 }
 
 int32_t GameSimulation::count_units(PlayerId p_owner, UnitType p_type) const {
