@@ -1,0 +1,13 @@
+CompileFlags:
+  CompilationDatabase: build
+  Add:
+    - -std=gnu++23
+    - -DLINUX_ENABLED
+    - -DUNIX_ENABLED
+    - -DTHREADS_ENABLED
+    - -DDEBUG_ENABLED
+    - -DNDEBUG
+    - -DGDEXTENSION
+    - -Iexternal/godot-cpp/include
+    - -Iexternal/godot-cpp/gen/include
+    - -Isrc

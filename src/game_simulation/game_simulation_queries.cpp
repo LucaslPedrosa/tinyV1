@@ -11,7 +11,19 @@ Unit *GameSimulation::find_unit(int32_t p_id) {
 		return nullptr;
 	}
 	for (Unit &unit : units) {
-		if (unit.id == p_id) {
+		if (unit.object.id == p_id) {
+			return &unit;
+		}
+	}
+	return nullptr;
+}
+
+const Unit *GameSimulation::find_unit(int32_t p_id) const {
+	if (p_id == -1) {
+		return nullptr;
+	}
+	for (const Unit &unit : units) {
+		if (unit.object.id == p_id) {
 			return &unit;
 		}
 	}
@@ -22,11 +34,11 @@ Unit *GameSimulation::find_player_unit_at(const Vector2 &p_position) {
 	float best_distance = 999999.0f;
 	Unit *best_unit = nullptr;
 	for (Unit &unit : units) {
-		if (unit.owner_component.owner != PLAYER) {
+		if (unit.object.owner_component.owner != PLAYER) {
 			continue;
 		}
 
-		const float distance = distance_to(p_position, unit.transform_component.position);
+		const float distance = distance_to(p_position, unit.object.transform_component.position);
 		if (distance <= unit_radius(unit) + 10.0f && distance < best_distance) {
 			best_distance = distance;
 			best_unit = &unit;
@@ -39,14 +51,14 @@ UnitId GameSimulation::find_player_unit_id_at(const Vector2 &p_position) const {
 	float best_distance = 999999.0f;
 	UnitId best_id = -1;
 	for (const Unit &unit : units) {
-		if (unit.owner_component.owner != PLAYER) {
+		if (unit.object.owner_component.owner != PLAYER) {
 			continue;
 		}
 
-		const float distance = distance_to(p_position, unit.transform_component.position);
+		const float distance = distance_to(p_position, unit.object.transform_component.position);
 		if (distance <= unit_radius(unit) + 10.0f && distance < best_distance) {
 			best_distance = distance;
-			best_id = unit.id;
+			best_id = unit.object.id;
 		}
 	}
 	return best_id;
@@ -61,8 +73,26 @@ ResourceNode *GameSimulation::find_resource(int32_t p_id) {
 	return nullptr;
 }
 
+const ResourceNode *GameSimulation::find_resource(int32_t p_id) const {
+	for (const ResourceNode &resource : resources) {
+		if (resource.id == p_id) {
+			return &resource;
+		}
+	}
+	return nullptr;
+}
+
 Base *GameSimulation::find_base(int32_t p_owner) {
 	for (Base &base : bases) {
+		if (base.owner_component.owner == p_owner) {
+			return &base;
+		}
+	}
+	return nullptr;
+}
+
+const Base *GameSimulation::find_base(int32_t p_owner) const {
+	for (const Base &base : bases) {
 		if (base.owner_component.owner == p_owner) {
 			return &base;
 		}
@@ -144,8 +174,8 @@ std::vector<BaseSummary> GameSimulation::get_render_bases() const {
 		summary.train_duration = base.production_component.train_duration;
 		summary.training_worker = base.production_component.training;
 		summary.worker_queue = base.production_component.queue;
-		summary.has_rally_point = base.rally_component.has_rally_point;
-		summary.rally_point = base.rally_component.rally_point;
+		summary.has_rally_point = base.rally_component.has_rally_action;
+		summary.rally_point = base.rally_component.position;
 		result.push_back(summary);
 	}
 	return result;
@@ -166,8 +196,8 @@ std::vector<BuildingSummary> GameSimulation::get_render_buildings() const {
 		summary.train_duration = building.production_component.train_duration;
 		summary.training_fighter = building.production_component.training;
 		summary.fighter_queue = building.production_component.queue;
-		summary.has_rally_point = building.rally_component.has_rally_point;
-		summary.rally_point = building.rally_component.rally_point;
+		summary.has_rally_point = building.rally_component.has_rally_action;
+		summary.rally_point = building.rally_component.position;
 		result.push_back(summary);
 	}
 	return result;
@@ -177,12 +207,14 @@ std::vector<UnitSummary> GameSimulation::get_render_units() const {
 	std::vector<UnitSummary> result;
 	for (const Unit &unit : units) {
 		UnitSummary summary;
-		summary.id = unit.id;
-		summary.owner = unit.owner_component.owner;
+		summary.id = unit.object.id;
+		summary.owner = unit.object.owner_component.owner;
 		summary.type = unit.type;
-		summary.position = unit.transform_component.position;
-		summary.hp = unit.health_component.hp;
+		summary.order = unit.order;
+		summary.position = unit.object.transform_component.position;
+		summary.hp = unit.object.health_component.hp;
 		summary.max_hp = unit.type == UnitType::WORKER ? 45.0f : 80.0f;
+		summary.moving = unit.order == UnitOrder::MOVE || unit.order == UnitOrder::RETURN || unit.order == UnitOrder::ATTACK || unit.order == UnitOrder::BUILD || (unit.order == UnitOrder::GATHER && !unit.gather_component.gathering_resource);
 		result.push_back(summary);
 	}
 	return result;
@@ -191,7 +223,7 @@ std::vector<UnitSummary> GameSimulation::get_render_units() const {
 int32_t GameSimulation::count_units(PlayerId p_owner, UnitType p_type) const {
 	int32_t count = 0;
 	for (const Unit &unit : units) {
-		if (unit.owner_component.owner == p_owner && unit.type == p_type) {
+		if (unit.object.owner_component.owner == p_owner && unit.type == p_type) {
 			count++;
 		}
 	}
@@ -201,8 +233,8 @@ int32_t GameSimulation::count_units(PlayerId p_owner, UnitType p_type) const {
 std::vector<UnitId> GameSimulation::get_unit_ids(PlayerId p_owner, UnitType p_type) const {
 	std::vector<UnitId> result;
 	for (const Unit &unit : units) {
-		if (unit.owner_component.owner == p_owner && unit.type == p_type) {
-			result.push_back(unit.id);
+		if (unit.object.owner_component.owner == p_owner && unit.type == p_type) {
+			result.push_back(unit.object.id);
 		}
 	}
 	return result;
@@ -211,8 +243,8 @@ std::vector<UnitId> GameSimulation::get_unit_ids(PlayerId p_owner, UnitType p_ty
 std::vector<UnitId> GameSimulation::get_idle_worker_ids(PlayerId p_owner) const {
 	std::vector<UnitId> result;
 	for (const Unit &unit : units) {
-		if (unit.owner_component.owner == p_owner && unit.type == UnitType::WORKER && unit.order == UnitOrder::IDLE) {
-			result.push_back(unit.id);
+		if (unit.object.owner_component.owner == p_owner && unit.type == UnitType::WORKER && unit.order == UnitOrder::IDLE) {
+			result.push_back(unit.object.id);
 		}
 	}
 	return result;
@@ -220,8 +252,8 @@ std::vector<UnitId> GameSimulation::get_idle_worker_ids(PlayerId p_owner) const 
 
 bool GameSimulation::get_unit_position(UnitId p_id, Vector2 &r_position) const {
 	for (const Unit &unit : units) {
-		if (unit.id == p_id) {
-			 r_position = unit.transform_component.position;
+		if (unit.object.id == p_id) {
+			 r_position = unit.object.transform_component.position;
 			return true;
 		}
 	}
@@ -230,13 +262,15 @@ bool GameSimulation::get_unit_position(UnitId p_id, Vector2 &r_position) const {
 
 bool GameSimulation::get_unit_summary(UnitId p_id, UnitSummary &r_summary) const {
 	for (const Unit &unit : units) {
-		if (unit.id == p_id) {
-			r_summary.id = unit.id;
-			 r_summary.owner = unit.owner_component.owner;
+		if (unit.object.id == p_id) {
+			r_summary.id = unit.object.id;
+			 r_summary.owner = unit.object.owner_component.owner;
 			r_summary.type = unit.type;
-			 r_summary.position = unit.transform_component.position;
-			 r_summary.hp = unit.health_component.hp;
+			r_summary.order = unit.order;
+			r_summary.position = unit.object.transform_component.position;
+			r_summary.hp = unit.object.health_component.hp;
 			r_summary.max_hp = unit.type == UnitType::WORKER ? 45.0f : 80.0f;
+			r_summary.moving = unit.order == UnitOrder::MOVE || unit.order == UnitOrder::RETURN || unit.order == UnitOrder::ATTACK || unit.order == UnitOrder::BUILD || (unit.order == UnitOrder::GATHER && !unit.gather_component.gathering_resource);
 			return true;
 		}
 	}
@@ -254,8 +288,8 @@ bool GameSimulation::get_base_summary(PlayerId p_owner, BaseSummary &r_summary) 
 			r_summary.train_duration = base.production_component.train_duration;
 			r_summary.training_worker = base.production_component.training;
 			r_summary.worker_queue = base.production_component.queue;
-			r_summary.has_rally_point = base.rally_component.has_rally_point;
-			r_summary.rally_point = base.rally_component.rally_point;
+			r_summary.has_rally_point = base.rally_component.has_rally_action;
+			r_summary.rally_point = base.rally_component.position;
 			return true;
 		}
 	}
@@ -276,8 +310,8 @@ bool GameSimulation::get_building_summary(BuildingId p_id, BuildingSummary &r_su
 			r_summary.train_duration = building.production_component.train_duration;
 			r_summary.training_fighter = building.production_component.training;
 			r_summary.fighter_queue = building.production_component.queue;
-			r_summary.has_rally_point = building.rally_component.has_rally_point;
-			r_summary.rally_point = building.rally_component.rally_point;
+			r_summary.has_rally_point = building.rally_component.has_rally_action;
+			r_summary.rally_point = building.rally_component.position;
 			return true;
 		}
 	}
@@ -343,16 +377,16 @@ bool GameSimulation::can_start_barracks_placement(PlayerId p_owner, UnitId p_bui
 UnitId GameSimulation::find_available_worker_id(PlayerId p_owner) const {
 	UnitId fallback_worker_id = -1;
 	for (const Unit &unit : units) {
-		if (unit.owner_component.owner != p_owner || unit.type != UnitType::WORKER) {
+		if (unit.object.owner_component.owner != p_owner || unit.type != UnitType::WORKER) {
 			continue;
 		}
 
 		if (unit.order == UnitOrder::IDLE) {
-			return unit.id;
+			return unit.object.id;
 		}
 
 		if (fallback_worker_id == -1 && (unit.order == UnitOrder::GATHER || unit.order == UnitOrder::RETURN || unit.order == UnitOrder::MOVE)) {
-			fallback_worker_id = unit.id;
+			fallback_worker_id = unit.object.id;
 		}
 	}
 	return fallback_worker_id;
@@ -384,13 +418,13 @@ int32_t GameSimulation::find_enemy_unit_id_at(int32_t p_owner, const Vector2 &p_
 	float best_distance = 999999.0f;
 	int32_t best_id = -1;
 	for (const Unit &unit : units) {
-		if (unit.owner_component.owner == p_owner || unit.health_component.hp <= 0.0f) {
+		if (unit.object.owner_component.owner == p_owner || unit.object.health_component.hp <= 0.0f) {
 			continue;
 		}
-		const float distance = distance_to(p_position, unit.transform_component.position);
+		const float distance = distance_to(p_position, unit.object.transform_component.position);
 		if (distance <= unit_radius(unit) + 10.0f && distance < best_distance) {
 			best_distance = distance;
-			best_id = unit.id;
+			best_id = unit.object.id;
 		}
 	}
 	return best_id;
@@ -399,7 +433,7 @@ int32_t GameSimulation::find_enemy_unit_id_at(int32_t p_owner, const Vector2 &p_
 Unit *GameSimulation::find_available_worker(int32_t p_owner) {
 	Unit *fallback_worker = nullptr;
 	for (Unit &unit : units) {
-		if (unit.owner_component.owner != p_owner || unit.type != UnitType::WORKER) {
+		if (unit.object.owner_component.owner != p_owner || unit.type != UnitType::WORKER) {
 			continue;
 		}
 
@@ -434,13 +468,13 @@ int32_t GameSimulation::find_enemy_unit_id(int32_t p_owner, const Vector2 &p_pos
 	float best_distance = 999999.0f;
 	int32_t best_id = -1;
 	for (const Unit &unit : units) {
-		if (unit.owner_component.owner == p_owner || unit.health_component.hp <= 0.0f) {
+		if (unit.object.owner_component.owner == p_owner || unit.object.health_component.hp <= 0.0f) {
 			continue;
 		}
-		const float distance = distance_to(p_position, unit.transform_component.position);
+		const float distance = distance_to(p_position, unit.object.transform_component.position);
 		if (distance <= p_range && distance < best_distance) {
 			best_distance = distance;
-			best_id = unit.id;
+			best_id = unit.object.id;
 		}
 	}
 	return best_id;

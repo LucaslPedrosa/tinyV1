@@ -6,6 +6,19 @@ using namespace godot;
 
 namespace tinyv1 {
 
+namespace {
+
+bool has_gather_rule(const GatherComponent &p_gather_component, ResourceType p_resource_type) {
+	for (const GatherRule &rule : p_gather_component.rules) {
+		if (rule.resource_type == p_resource_type) {
+			return true;
+		}
+	}
+	return false;
+}
+
+} // namespace
+
 GameCommandResult GameSimulation::apply_command(const GameCommand &p_command) {
 	GameCommandResult result;
 	switch (p_command.type) {
@@ -31,8 +44,7 @@ bool GameSimulation::set_selected_production_rally_point(int32_t p_owner, int32_
 	if (p_selected_base_owner == p_owner) {
 		Base *base = find_base(p_owner);
 		if (base != nullptr) {
-			base->rally_component.has_rally_point = true;
-			base->rally_component.rally_point = p_position;
+			base->rally_component = resolve_rally_action_for_production(p_owner, UnitType::WORKER, p_position);
 		}
 		return true;
 	}
@@ -40,8 +52,7 @@ bool GameSimulation::set_selected_production_rally_point(int32_t p_owner, int32_
 	Barracks *building = find_barracks_by_id(p_selected_building_id);
 	if (building != nullptr) {
 		if (building->owner_component.owner == p_owner) {
-			building->rally_component.has_rally_point = true;
-			building->rally_component.rally_point = p_position;
+			building->rally_component = resolve_rally_action_for_production(p_owner, UnitType::FIGHTER, p_position);
 		}
 		return true;
 	}
@@ -54,15 +65,23 @@ CommandFeedback GameSimulation::command_selected_to(int32_t p_owner, const std::
 	CommandFeedback feedback;
 	if (set_selected_production_rally_point(p_owner, p_selected_base_owner, p_selected_building_id, p_position)) {
 		feedback.has_marker = true;
-		feedback.marker_position = p_position;
+		if (p_selected_base_owner == p_owner) {
+			Base *base = find_base(p_owner);
+			feedback.marker_position = base != nullptr ? base->rally_component.position : p_position;
+		} else {
+			Barracks *building = find_barracks_by_id(p_selected_building_id);
+			feedback.marker_position = building != nullptr ? building->rally_component.position : p_position;
+		}
 		return feedback;
 	}
 
 	int32_t resource_id = -1;
+	ResourceType resource_type = ResourceType::ESSENCE;
 	Vector2 marker_position = p_position;
 	for (const ResourceNode &resource : resources) {
 		if (resource.amount > 0 && distance_to(p_position, resource.position) <= RESOURCE_RADIUS + 14.0f) {
 			resource_id = resource.id;
+			resource_type = resource.type;
 			marker_position = resource.position;
 			break;
 		}
@@ -91,7 +110,7 @@ CommandFeedback GameSimulation::command_selected_to(int32_t p_owner, const std::
 	int32_t selected_index = 0;
 	for (int32_t unit_id : p_selected_unit_ids) {
 		Unit *selected_unit = find_unit(unit_id);
-		if (selected_unit == nullptr || selected_unit->owner_component.owner != p_owner) {
+		if (selected_unit == nullptr || selected_unit->object.owner_component.owner != p_owner) {
 			continue;
 		}
 		Unit &unit = *selected_unit;
@@ -107,7 +126,7 @@ CommandFeedback GameSimulation::command_selected_to(int32_t p_owner, const std::
 			unit.build_component.target_building_id = build_barracks_id;
 			unit.movement_component.target_position = build_barracks->transform_component.position;
 			unit.order = UnitOrder::BUILD;
-		} else if (resource_id != -1 && unit.type == UnitType::WORKER) {
+		} else if (resource_id != -1 && has_gather_rule(unit.gather_component, resource_type)) {
 			unit.gather_component.gathering_resource = false;
 			unit.combat_component.target_unit_id = -1;
 			unit.combat_component.target_base_owner = -1;
@@ -124,7 +143,7 @@ CommandFeedback GameSimulation::command_selected_to(int32_t p_owner, const std::
 				unit.movement_component.target_position = enemy_barracks != nullptr ? enemy_barracks->transform_component.position + offset : p_position + offset;
 			} else if (enemy_unit_id != -1) {
 				Unit *enemy_unit = find_unit(enemy_unit_id);
-				unit.movement_component.target_position = enemy_unit != nullptr ? enemy_unit->transform_component.position + offset : p_position + offset;
+				unit.movement_component.target_position = enemy_unit != nullptr ? enemy_unit->object.transform_component.position + offset : p_position + offset;
 			} else {
 				unit.movement_component.target_position = attack_enemy_base && enemy_base != nullptr ? enemy_base->transform_component.position + offset : p_position + offset;
 			}

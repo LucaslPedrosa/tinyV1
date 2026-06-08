@@ -21,10 +21,17 @@ The first major refactor moved most gameplay behavior out of `TinyGame` and into
 Current split:
 
 - `TinyGame` mostly handles Godot integration, drawing, raw input, texture loading, and HUD callbacks.
+- `UnitRenderer` now owns unit texture loading and unit drawing, including the first humanoid contract for Worker.
+- `HudPresenter` now owns formatting of HUD text, portraits, action button labels, icons, and enabled state.
+- `LocalInputController` now owns local mouse/keyboard/HUD action interpretation and emits player commands through the existing command path.
+- Simple sockets are implemented as `bone + offset` attachments, starting with the Worker pickaxe.
 - `LocalPlayerState` owns local selection, drag selection, placement preview, and command marker presentation state.
 - `BotController` owns temporary bot decision timing and emits bot commands.
 - `GameSimulation` owns authoritative match state, unit updates, gathering, combat, production, Barracks lifecycle, command application helpers, cleanup, and win checks.
-- Unit action state is now split into dedicated components inside `Unit` instead of a flat action field set.
+- `Unit` now composes a `GameObject` for identity/owner/transform/health and keeps action state in dedicated components.
+- `GatherComponent` now carries per-resource `GatherRule` entries instead of a generic capability flag.
+- `UnitSummary` exposes `order`, which will drive the future modular animation selection layer.
+- Unit movement now has first-pass local steering to avoid resources, bases, Barracks, and unit overlap without full pathfinding.
 - `GameTypes.hpp` contains the basic enums and structs.
 - `game_constants.hpp` contains shared constants and small math/stat helpers.
 
@@ -35,7 +42,7 @@ Current architectural problem:
 - Player input now uses the first `GameCommand` path for commands, training, placement, and deletion.
 - Bot behavior now emits `GameCommand` values for gathering recovery, training, building, and attacks.
 - Bot decisions now live in `BotController` and read simulation state through initial read-only queries.
-- Simulation internals are now private; remaining architecture work is reducing command/helper thin wrappers and preparing data-driven/composed game objects.
+- Simulation internals are now private; remaining architecture work is reducing command/helper thin wrappers and preparing data-driven/composed game objects and animation rigs.
 
 ## Guiding Direction
 
@@ -66,6 +73,11 @@ Completed immediate-priority items:
 - Shared constants were moved into `game_constants.hpp`.
 - Local UI/input state was moved into `LocalPlayerState`.
 - Barracks/building references were moved from vector indices to `BuildingId`.
+- Unit identity/position/HP now compose through `GameObject` instead of living flat on `Unit`.
+- Gather behavior now uses per-resource rules so archetypes can differ without capability flags.
+- Unit drawing started moving out of `TinyGame` into `UnitRenderer`.
+- Unit props can now attach to simple sockets without affecting gameplay state.
+- First-pass local collision avoidance exists for movement; future pathfinding can build on top of it.
 - Initial `GameCommand` path exists for player input.
 - Bot behavior was routed through the initial `GameCommand` path.
 - Bot decisions were extracted from `GameSimulation` into `BotController`.

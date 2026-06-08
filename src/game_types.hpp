@@ -11,6 +11,11 @@ using PlayerId = int32_t;
 using UnitId = int32_t;
 using BuildingId = int32_t;
 using ResourceId = int32_t;
+using ObjectId = int32_t;
+
+enum class ResourceType {
+	ESSENCE,
+};
 
 enum class UnitType {
 	WORKER,
@@ -28,6 +33,7 @@ enum class UnitOrder {
 
 struct ResourceNode {
 	int32_t id = 0;
+	ResourceType type = ResourceType::ESSENCE;
 	godot::Vector2 position;
 	int32_t amount = 0;
 };
@@ -45,9 +51,31 @@ struct HealthComponent {
 	float max_hp = 0.0f;
 };
 
-struct RallyPointComponent {
-	bool has_rally_point = false;
-	godot::Vector2 rally_point;
+struct GameObject {
+	ObjectId id = -1;
+	OwnerComponent owner_component;
+	TransformComponent transform_component;
+	HealthComponent health_component;
+};
+
+enum class RallyActionType {
+	NONE,
+	MOVE,
+	GATHER,
+	ATTACK_MOVE,
+	ATTACK_UNIT,
+	ATTACK_BUILDING,
+	ATTACK_BASE,
+};
+
+struct RallyActionComponent {
+	bool has_rally_action = false;
+	RallyActionType type = RallyActionType::NONE;
+	godot::Vector2 position;
+	ResourceId target_resource = -1;
+	UnitId target_unit_id = -1;
+	BuildingId target_building_id = -1;
+	PlayerId target_base_owner = -1;
 };
 
 struct ProductionQueueComponent {
@@ -73,10 +101,18 @@ struct CombatComponent {
 	BuildingId target_building_id = -1;
 };
 
+struct GatherRule {
+	ResourceType resource_type = ResourceType::ESSENCE;
+	float gather_time = 0.0f;
+	int32_t amount_per_trip = 0;
+};
+
 struct GatherComponent {
+	std::vector<GatherRule> rules;
 	float gather_timer = 0.0f;
 	bool gathering_resource = false;
 	int32_t carrying = 0;
+	ResourceType carrying_resource_type = ResourceType::ESSENCE;
 	ResourceId target_resource = -1;
 };
 
@@ -89,7 +125,7 @@ struct Base {
 	TransformComponent transform_component;
 	HealthComponent health_component;
 	ProductionQueueComponent production_component;
-	RallyPointComponent rally_component;
+	RallyActionComponent rally_component;
 };
 
 struct Barracks {
@@ -99,14 +135,11 @@ struct Barracks {
 	HealthComponent health_component;
 	ConstructionComponent construction_component;
 	ProductionQueueComponent production_component;
-	RallyPointComponent rally_component;
+	RallyActionComponent rally_component;
 };
 
 struct Unit {
-	UnitId id = 0;
-	OwnerComponent owner_component;
-	TransformComponent transform_component;
-	HealthComponent health_component;
+	GameObject object;
 	UnitType type = UnitType::WORKER;
 	UnitOrder order = UnitOrder::IDLE;
 	MovementComponent movement_component;
@@ -119,9 +152,11 @@ struct UnitSummary {
 	UnitId id = -1;
 	PlayerId owner = -1;
 	UnitType type = UnitType::WORKER;
+	UnitOrder order = UnitOrder::IDLE;
 	godot::Vector2 position;
 	float hp = 0.0f;
 	float max_hp = 0.0f;
+	bool moving = false;
 };
 
 struct ResourceSummary {

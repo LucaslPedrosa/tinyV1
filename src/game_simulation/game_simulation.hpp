@@ -53,9 +53,12 @@ public:
 
 private:
 	Unit *find_unit(int32_t p_id);
+	const Unit *find_unit(int32_t p_id) const;
 	Unit *find_player_unit_at(const godot::Vector2 &p_position);
 	ResourceNode *find_resource(int32_t p_id);
+	const ResourceNode *find_resource(int32_t p_id) const;
 	Base *find_base(int32_t p_owner);
+	const Base *find_base(int32_t p_owner) const;
 	Barracks *find_barracks(int32_t p_owner);
 	Barracks *find_barracks_by_id(BuildingId p_id);
 	const Barracks *find_barracks_by_id(BuildingId p_id) const;
@@ -75,8 +78,12 @@ private:
 	void update_unit_return(Unit &p_unit, double p_delta);
 	void update_unit_attack(Unit &p_unit, double p_delta);
 	void update_unit(Unit &p_unit, double p_delta);
+	void move_unit_toward_with_avoidance(Unit &p_unit, const godot::Vector2 &p_target, float p_max_distance, ResourceId p_ignored_resource = -1, BuildingId p_ignored_building = -1, PlayerId p_ignored_base_owner = -1);
+	Unit create_unit(UnitId p_id, PlayerId p_owner, UnitType p_type, const godot::Vector2 &p_position) const;
+	RallyActionComponent resolve_rally_action_for_production(PlayerId p_owner, UnitType p_produced_type, const godot::Vector2 &p_position) const;
+	void apply_rally_action_to_unit(Unit &p_unit, const RallyActionComponent &p_rally_action);
 	void train_unit(int32_t p_owner, UnitType p_type, BuildingId p_source_building_id = -1);
-	void spawn_unit(int32_t p_owner, UnitType p_type, const godot::Vector2 &p_source_position, bool p_has_rally_point = false, const godot::Vector2 &p_rally_point = godot::Vector2());
+	void spawn_unit(int32_t p_owner, UnitType p_type, const godot::Vector2 &p_source_position, float p_spawn_distance, const RallyActionComponent *p_rally_action = nullptr);
 	BuildingId place_barracks(int32_t p_owner, const godot::Vector2 &p_position, Unit *p_builder = nullptr);
 	void delete_barracks(BuildingId p_building_id);
 	bool set_selected_production_rally_point(int32_t p_owner, int32_t p_selected_base_owner, BuildingId p_selected_building_id, const godot::Vector2 &p_position);

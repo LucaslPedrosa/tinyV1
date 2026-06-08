@@ -61,6 +61,7 @@ Food, Wood, Gold, and Favor.
 Prototype units:
 
 - Worker: gathers resources, builds structures, repairs buildings
+
 - Fighter: cheap melee combat unit
 
 
@@ -68,7 +69,7 @@ The game is supposed to have complex combat and unit interactions eventually, bu
 
 - Ranged unit
 - Heavy unit
-- C
+- Cavalary
 - Scout
 - Mythics unique units per civilization or god
 

@@ -9,4 +9,4 @@ if [ ! -x ".venv/bin/scons" ] || [ ! -d "external/godot-cpp" ]; then
   exit 1
 fi
 
-".venv/bin/scons" platform=linux target=template_debug arch=x86_64 "$@"
+".venv/bin/scons" platform=linux target=template_debug arch=x86_64 compiledb=yes compiledb_file=build/compile_commands.json "$@"

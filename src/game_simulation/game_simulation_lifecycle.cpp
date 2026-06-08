@@ -7,7 +7,7 @@
 namespace tinyv1 {
 
 void GameSimulation::remove_dead_units() {
-	units.erase(std::remove_if(units.begin(), units.end(), [](const Unit &unit) { return unit.health_component.hp <= 0.0f; }), units.end());
+	units.erase(std::remove_if(units.begin(), units.end(), [](const Unit &unit) { return unit.object.health_component.hp <= 0.0f; }), units.end());
 }
 
 void GameSimulation::remove_destroyed_barracks() {

@@ -1,17 +1,15 @@
 #pragma once
 
 #include "bot_controller.hpp"
-#include "game_simulation.hpp"
+#include "game_simulation/game_simulation.hpp"
 #include "local_player_state.hpp"
+#include "rendering/game_renderer.hpp"
 
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/input_event.hpp>
-#include <godot_cpp/classes/texture2d.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/variant/color.hpp>
-#include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/string.hpp>
-#include <godot_cpp/variant/vector2.hpp>
 
 namespace tinyv1 {
 
@@ -21,11 +19,8 @@ class TinyGame : public godot::Node2D {
 	GameSimulation sim;
 	BotController bot;
 	LocalPlayerState local;
-	godot::Ref<godot::Texture2D> worker_texture;
-	godot::Ref<godot::Texture2D> fighter_texture;
-	godot::Ref<godot::Texture2D> base_texture;
-	godot::Ref<godot::Texture2D> barracks_texture;
-	godot::Ref<godot::Texture2D> goldmine_texture;
+	GameRenderer renderer;
+	float animation_time = 0.0f;
 
 protected:
 	static void _bind_methods();
@@ -54,13 +49,6 @@ public:
 
 private:
 	void reset_match();
-	void load_textures();
-	bool first_selected_unit_summary(UnitSummary &r_summary) const;
-	bool selected_building_summary(BuildingSummary &r_summary) const;
-	float unit_radius(const UnitSummary &p_unit) const;
-	godot::Vector2 unit_sprite_size(const UnitSummary &p_unit) const;
-	godot::Vector2 unit_sprite_top_left(const UnitSummary &p_unit) const;
-	godot::Color owner_color(int32_t p_owner) const;
 };
 
 } // namespace tinyv1
