@@ -5,7 +5,10 @@ import os
 env = SConscript("external/godot-cpp/SConstruct")
 
 game_env = env.Clone()
-game_env.Append(CXXFLAGS=["-std=gnu++23"])
+if game_env.get("is_msvc", False):
+    game_env.Append(CXXFLAGS=["/std:c++latest"])
+else:
+    game_env.Append(CXXFLAGS=["-std=gnu++23"])
 game_env.Append(CPPPATH=["src"])
 
 game_env.VariantDir("build/src", "src", duplicate=0)
