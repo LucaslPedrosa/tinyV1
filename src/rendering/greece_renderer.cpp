@@ -2,6 +2,7 @@
 
 #include "game_constants.hpp"
 #include "rendering/render_constants.hpp"
+#include "rendering/render_helpers.hpp"
 #include "rendering/texture_loader.hpp"
 
 #include <algorithm>
@@ -15,25 +16,21 @@ namespace tinyv1
 namespace
 {
 
-enum HumanoidPart : size_t {
+enum HumanoidPart : size_t
+{
+  LEFT_ARM,
+  RIGHT_ARM,
+  LEFT_SHOULDER,
+  RIGHT_SHOULDER,
+  LEFT_LEG,
+  RIGHT_LEG,
   HEAD,
   TORSO,
-  LEFT_SHOULDER,
-  LEFT_ARM,
-  LEFT_LEG,
-  RIGHT_SHOULDER,
-  RIGHT_ARM,
-  RIGHT_LEG,
 };
 
 Color owner_color(PlayerId p_owner)
 {
   return p_owner == PLAYER ? Color(0.25f, 0.55f, 1.0f) : Color(0.95f, 0.25f, 0.22f);
-}
-
-Vector2 pixel_snap(const Vector2 &p_position)
-{
-  return Vector2(std::round(p_position.x), std::round(p_position.y));
 }
 
 } // namespace
@@ -46,11 +43,16 @@ bool GreeceRenderer::HumanoidTextures::has_body() const
 void GreeceRenderer::load_textures()
 {
   load_humanoid_textures("worker", worker_textures);
-  worker_textures.right_hand_item = load_texture(asset_contracts::humanoid_item("tools", "pickaxe"));
+  add_humanoid_attachment(worker_textures, asset_contracts::humanoid_item("tools", "pickaxe"),
+                          HumanoidBone::RIGHT_ARM);
 
   load_humanoid_textures("hoplite", hoplite_textures);
-  hoplite_textures.right_hand_item = load_texture(asset_contracts::humanoid_item("weapons", "spear"));
-  hoplite_textures.left_hand_item = load_texture(asset_contracts::humanoid_item("weapons", "shield"));
+  add_humanoid_attachment(hoplite_textures,
+                          asset_contracts::humanoid_item("weapons", "spear_1wood"),
+                          HumanoidBone::LEFT_ARM);
+  add_humanoid_attachment(hoplite_textures,
+                          asset_contracts::humanoid_item("weapons", "shield_3gold"),
+                          HumanoidBone::RIGHT_ARM);
 
   town_center_texture = load_texture(asset_contracts::building_sprite("towncenter"));
   barracks_texture = load_texture(asset_contracts::building_sprite("barracks"));
@@ -60,6 +62,7 @@ void GreeceRenderer::load_humanoid_textures(const char *p_unit_folder,
                                             HumanoidTextures &r_textures) const
 {
   r_textures.body_ready = true;
+  r_textures.attachment_count = 0;
   for (size_t i = 0; i < asset_contracts::HUMANOID_PART_FILES.size(); ++i)
   {
     r_textures.body_parts[i] = load_texture(asset_contracts::humanoid_part(p_unit_folder, i));
@@ -70,49 +73,69 @@ void GreeceRenderer::load_humanoid_textures(const char *p_unit_folder,
   }
 }
 
-void GreeceRenderer::draw_base(Node2D &p_canvas, const BaseSummary &p_base) const
+void GreeceRenderer::add_humanoid_attachment(HumanoidTextures &r_textures, const String &p_path,
+                                             HumanoidBone p_follow_bone) const
 {
-  const Color color = owner_color(p_base.owner);
-  if (town_center_texture.is_valid())
+  if (r_textures.attachment_count >= r_textures.attachments.size())
   {
-    p_canvas.draw_texture_rect(town_center_texture,
-                               Rect2(pixel_snap(p_base.position -
-                                          Vector2(render_constants::TOWN_CENTER_SPRITE_SIZE * 0.5f,
-                                                  render_constants::TOWN_CENTER_SPRITE_SIZE * 0.5f)),
-                                      Vector2(render_constants::TOWN_CENTER_SPRITE_SIZE,
-                                              render_constants::TOWN_CENTER_SPRITE_SIZE)),
-                               false);
     return;
   }
 
-  p_canvas.draw_circle(p_base.position, BASE_RADIUS, color.darkened(0.25f));
-  p_canvas.draw_rect(Rect2(p_base.position - Vector2(120, 110), Vector2(240, 220)), color, true);
-  p_canvas.draw_rect(Rect2(p_base.position - Vector2(122, 112), Vector2(244, 224)),
-                     Color(0.04f, 0.04f, 0.04f), false, 2.0f);
+  Ref<Texture2D> texture = load_texture(p_path);
+  if (!texture.is_valid())
+  {
+    return;
+  }
+
+  r_textures.attachments[r_textures.attachment_count] = {texture, p_follow_bone};
+  ++r_textures.attachment_count;
 }
 
-void GreeceRenderer::draw_barracks(Node2D &p_canvas, const BuildingSummary &p_building) const
+void GreeceRenderer::draw_building(Node2D &p_canvas, const BuildingSummary &p_building) const
 {
   const Color color = owner_color(p_building.owner).darkened(0.1f);
-  const Color sprite_modulate =
-      p_building.completed ? Color(1, 1, 1, 1) : Color(1, 1, 1, 0.45f);
+  const Color sprite_modulate = p_building.completed ? Color(1, 1, 1, 1) : Color(1, 1, 1, 0.45f);
+
+  if (p_building.type == BuildingType::TOWN_CENTER)
+  {
+    if (town_center_texture.is_valid())
+    {
+      p_canvas.draw_texture_rect(
+          town_center_texture,
+          Rect2(pixel_snap(p_building.position -
+                           Vector2(render_constants::TOWN_CENTER_SPRITE_SIZE * 0.5f,
+                                   render_constants::TOWN_CENTER_SPRITE_SIZE * 0.5f)),
+                Vector2(render_constants::TOWN_CENTER_SPRITE_SIZE,
+                        render_constants::TOWN_CENTER_SPRITE_SIZE)),
+          false);
+      return;
+    }
+
+    p_canvas.draw_circle(p_building.position, BASE_RADIUS, color.darkened(0.25f));
+    p_canvas.draw_rect(Rect2(p_building.position - Vector2(120, 110), Vector2(240, 220)), color,
+                       true);
+    p_canvas.draw_rect(Rect2(p_building.position - Vector2(122, 112), Vector2(244, 224)),
+                       Color(0.04f, 0.04f, 0.04f), false, 2.0f);
+    return;
+  }
 
   if (barracks_texture.is_valid())
   {
-    p_canvas.draw_texture_rect(barracks_texture,
-                               Rect2(pixel_snap(p_building.position -
-                                          Vector2(render_constants::BARRACKS_SPRITE_SIZE * 0.5f,
-                                                  render_constants::BARRACKS_SPRITE_SIZE * 0.5f)),
-                                      Vector2(render_constants::BARRACKS_SPRITE_SIZE,
-                                              render_constants::BARRACKS_SPRITE_SIZE)),
-                               false, sprite_modulate);
+    p_canvas.draw_texture_rect(
+        barracks_texture,
+        Rect2(pixel_snap(p_building.position -
+                         Vector2(render_constants::BARRACKS_SPRITE_SIZE * 0.5f,
+                                 render_constants::BARRACKS_SPRITE_SIZE * 0.5f)),
+              Vector2(render_constants::BARRACKS_SPRITE_SIZE,
+                      render_constants::BARRACKS_SPRITE_SIZE)),
+        false, sprite_modulate);
     return;
   }
 
   p_canvas.draw_rect(Rect2(p_building.position - Vector2(88, 78), Vector2(176, 156)),
                      p_building.completed ? color : color.lightened(0.35f), true);
-  p_canvas.draw_line(p_building.position + Vector2(-64, 0),
-                     p_building.position + Vector2(64, 0), Color(0.05f, 0.05f, 0.05f), 4.0f);
+  p_canvas.draw_line(p_building.position + Vector2(-64, 0), p_building.position + Vector2(64, 0),
+                     Color(0.05f, 0.05f, 0.05f), 4.0f);
 }
 
 float GreeceRenderer::unit_radius(const UnitSummary &p_unit) const
@@ -134,112 +157,87 @@ Vector2 GreeceRenderer::unit_top_left(const UnitSummary &p_unit) const
   return p_unit.position - Vector2(size.x * 0.5f, size.y - render_constants::UNIT_BASELINE_OFFSET);
 }
 
-HumanoidPose GreeceRenderer::humanoid_pose_for(const UnitSummary &p_unit,
-                                               float p_animation_time) const
+HumanoidPose GreeceRenderer::setup_pose_for(UnitType p_type) const
 {
   HumanoidPose pose;
-  if (!p_unit.moving && p_unit.order == UnitOrder::GATHER)
+  if (p_type == UnitType::FIGHTER)
   {
-    const float bob =
-        std::round(std::sin(p_animation_time * 8.0f + static_cast<float>(p_unit.id) * 0.2f) * 1.5f);
-    pose.right_arm.offset = Vector2(2.0f, bob);
-  }
-  else if (!p_unit.moving && p_unit.order == UnitOrder::ATTACK)
-  {
-    pose.right_arm.offset = Vector2(4.0f, -1.0f);
+    pose.left_arm.rotation = -90;
+    pose.left_arm.offset += Vector2(-15.0f, -7.0f);
   }
   return pose;
 }
 
-Vector2 GreeceRenderer::bone_position(const HumanoidPose &p_pose, HumanoidBone p_bone,
-                                      const Vector2 &p_top_left) const
+HumanoidPose GreeceRenderer::humanoid_pose_for(const UnitSummary &p_unit,
+                                               float p_animation_time) const
 {
-  switch (p_bone)
+  HumanoidPose pose = setup_pose_for(p_unit.type);
+  if (!p_unit.moving && p_unit.order == UnitOrder::GATHER)
   {
-  case HumanoidBone::TORSO:
-    return p_top_left + Vector2(0.0f, 0.0f) + p_pose.torso.offset;
-  case HumanoidBone::HEAD:
-    return p_top_left + Vector2(0.0f, -8.0f) + p_pose.head.offset;
-  case HumanoidBone::LEFT_SHOULDER:
-    return p_top_left + Vector2(6.0f, 8.0f) + p_pose.left_shoulder.offset;
-  case HumanoidBone::RIGHT_SHOULDER:
-    return p_top_left + Vector2(18.0f, 8.0f) + p_pose.right_shoulder.offset;
-  case HumanoidBone::LEFT_ARM:
-    return p_top_left + Vector2(4.0f, 12.0f) + p_pose.left_arm.offset;
-  case HumanoidBone::RIGHT_ARM:
-    return p_top_left + Vector2(16.0f, 12.0f) + p_pose.right_arm.offset;
-  case HumanoidBone::LEFT_LEG:
-    return p_top_left + Vector2(5.0f, 20.0f) + p_pose.left_leg.offset;
-  case HumanoidBone::RIGHT_LEG:
-    return p_top_left + Vector2(15.0f, 20.0f) + p_pose.right_leg.offset;
-  case HumanoidBone::ROOT:
-  default:
-    return p_top_left + p_pose.root.offset;
+    const float bob =
+        std::round(std::sin(p_animation_time * 8.0f + static_cast<float>(p_unit.id) * 0.2f) * 1.5f);
+    pose.right_arm.offset += Vector2(2.0f, bob);
   }
-}
-
-Vector2 GreeceRenderer::socket_position(const HumanoidPose &p_pose, HumanoidSocket p_socket,
-                                        const Vector2 &p_top_left) const
-{
-  switch (p_socket)
+  else if (!p_unit.moving && p_unit.order == UnitOrder::ATTACK)
   {
-  case HumanoidSocket::TORSO:
-    return bone_position(p_pose, HumanoidBone::TORSO, p_top_left) + Vector2(8.0f, 12.0f);
-  case HumanoidSocket::HEAD:
-    return bone_position(p_pose, HumanoidBone::HEAD, p_top_left) + Vector2(8.0f, 8.0f);
-  case HumanoidSocket::LEFT_HAND:
-    return bone_position(p_pose, HumanoidBone::LEFT_ARM, p_top_left) + Vector2(6.0f, 16.0f);
-  case HumanoidSocket::RIGHT_HAND:
-    return bone_position(p_pose, HumanoidBone::RIGHT_ARM, p_top_left) + Vector2(6.0f, 16.0f);
-  case HumanoidSocket::LEFT_SHOULDER:
-    return bone_position(p_pose, HumanoidBone::LEFT_SHOULDER, p_top_left);
-  case HumanoidSocket::RIGHT_SHOULDER:
-    return bone_position(p_pose, HumanoidBone::RIGHT_SHOULDER, p_top_left);
-  default:
-    return p_top_left;
+    pose.right_arm.offset += Vector2(4.0f, -1.0f);
   }
+  return pose;
 }
 
 void GreeceRenderer::draw_humanoid(Node2D &p_canvas, const UnitSummary &p_unit,
-                                   const HumanoidTextures &p_textures,
-                                   float p_animation_time) const
+                                   const HumanoidTextures &p_textures, float p_animation_time) const
 {
   const Vector2 top_left = pixel_snap(unit_top_left(p_unit));
   const Vector2 size = unit_size(p_unit);
   const HumanoidPose pose = humanoid_pose_for(p_unit, p_animation_time);
 
-  p_canvas.draw_texture_rect(p_textures.body_parts[LEFT_LEG],
-                             Rect2(pixel_snap(top_left + pose.left_leg.offset), size), false);
-  p_canvas.draw_texture_rect(p_textures.body_parts[RIGHT_LEG],
-                             Rect2(pixel_snap(top_left + pose.right_leg.offset), size), false);
-  p_canvas.draw_texture_rect(p_textures.body_parts[TORSO], Rect2(pixel_snap(top_left + pose.torso.offset), size),
-                             false);
-  p_canvas.draw_texture_rect(p_textures.body_parts[LEFT_SHOULDER],
-                             Rect2(pixel_snap(top_left + pose.left_shoulder.offset), size), false);
-  p_canvas.draw_texture_rect(p_textures.body_parts[RIGHT_SHOULDER],
-                             Rect2(pixel_snap(top_left + pose.right_shoulder.offset), size), false);
-  p_canvas.draw_texture_rect(
-      p_textures.body_parts[LEFT_ARM],
-      Rect2(pixel_snap(top_left + pose.left_shoulder.offset + pose.left_arm.offset), size), false);
-  p_canvas.draw_texture_rect(
-      p_textures.body_parts[RIGHT_ARM],
-      Rect2(pixel_snap(top_left + pose.right_shoulder.offset + pose.right_arm.offset), size), false);
-  p_canvas.draw_texture_rect(p_textures.body_parts[HEAD], Rect2(pixel_snap(top_left + pose.head.offset), size),
-                             false);
+  draw_bone_texture(p_canvas, p_textures.body_parts[LEFT_LEG], top_left + pose.left_leg.offset,
+                    size, pose.left_leg.rotation);
+  draw_bone_texture(p_canvas, p_textures.body_parts[RIGHT_LEG], top_left + pose.right_leg.offset,
+                    size, pose.right_leg.rotation);
+  draw_bone_texture(p_canvas, p_textures.body_parts[LEFT_SHOULDER],
+                    top_left + pose.left_shoulder.offset, size, pose.left_shoulder.rotation);
+  draw_bone_texture(p_canvas, p_textures.body_parts[RIGHT_SHOULDER],
+                    top_left + pose.right_shoulder.offset, size, pose.right_shoulder.rotation);
+  draw_bone_texture(p_canvas, p_textures.body_parts[TORSO], top_left + pose.torso.offset, size,
+                    pose.torso.rotation);
+  draw_bone_texture(p_canvas, p_textures.body_parts[HEAD], top_left + pose.head.offset, size,
+                    pose.head.rotation);
 
-  if (p_textures.right_hand_item.is_valid())
+  for (size_t i = 0; i < p_textures.attachment_count; ++i)
   {
-    const Vector2 item_size = p_textures.right_hand_item->get_size();
-    const Vector2 item_position =
-        pixel_snap(socket_position(pose, HumanoidSocket::RIGHT_HAND, top_left) - item_size * 0.5f);
-    p_canvas.draw_texture_rect(p_textures.right_hand_item, Rect2(item_position, item_size), false);
+    const HumanoidTextures::Attachment &attachment = p_textures.attachments[i];
+    if (attachment.follow_bone == HumanoidBone::RIGHT_ARM)
+    {
+      continue;
+    }
+    const Vector2 item_size = attachment.texture->get_size();
+    const Vector2 item_position = top_left + attachment_offset(pose, attachment.follow_bone);
+    const float item_rotation = attachment_rotation(pose, attachment.follow_bone);
+    draw_bone_texture(p_canvas, attachment.texture, item_position, item_size, item_rotation);
   }
-  if (p_textures.left_hand_item.is_valid())
+
+  const float left_arm_rotation = pose.left_shoulder.rotation + pose.left_arm.rotation;
+  draw_bone_texture(p_canvas, p_textures.body_parts[LEFT_ARM],
+                    top_left + pose.left_shoulder.offset + pose.left_arm.offset, size,
+                    left_arm_rotation);
+  const float right_arm_rotation = pose.right_shoulder.rotation + pose.right_arm.rotation;
+  draw_bone_texture(p_canvas, p_textures.body_parts[RIGHT_ARM],
+                    top_left + pose.right_shoulder.offset + pose.right_arm.offset, size,
+                    right_arm_rotation);
+
+  for (size_t i = 0; i < p_textures.attachment_count; ++i)
   {
-    const Vector2 item_size = p_textures.left_hand_item->get_size();
-    const Vector2 item_position =
-        pixel_snap(socket_position(pose, HumanoidSocket::LEFT_HAND, top_left) - item_size * 0.5f);
-    p_canvas.draw_texture_rect(p_textures.left_hand_item, Rect2(item_position, item_size), false);
+    const HumanoidTextures::Attachment &attachment = p_textures.attachments[i];
+    if (attachment.follow_bone != HumanoidBone::RIGHT_ARM)
+    {
+      continue;
+    }
+    const Vector2 item_size = attachment.texture->get_size();
+    const Vector2 item_position = top_left + attachment_offset(pose, attachment.follow_bone);
+    const float item_rotation = attachment_rotation(pose, attachment.follow_bone);
+    draw_bone_texture(p_canvas, attachment.texture, item_position, item_size, item_rotation);
   }
 }
 

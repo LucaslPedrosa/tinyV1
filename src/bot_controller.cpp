@@ -1,5 +1,7 @@
 #include "bot_controller.hpp"
 
+#include "definitions/building_definitions.hpp"
+#include "definitions/unit_definitions.hpp"
 #include "game_constants.hpp"
 #include "game_simulation/game_simulation.hpp"
 
@@ -47,9 +49,9 @@ std::vector<GameCommand> BotController::update(const GameSimulation &p_simulatio
 
   const int32_t bot_workers = p_simulation.count_units(BOT, UnitType::WORKER);
   const int32_t bot_fighters = p_simulation.count_units(BOT, UnitType::FIGHTER);
-  const int32_t bot_essence = p_simulation.get_essence(BOT);
+  const ResourceWallet &bot_resources = p_simulation.get_resources(BOT);
 
-  if (bot_workers < 5 && bot_essence >= WORKER_COST)
+  if (bot_workers < 5 && bot_resources.can_afford(get_unit_definition(UnitType::WORKER).cost))
   {
     GameCommand command;
     command.type = GameCommandType::TRAIN_UNIT;
@@ -57,21 +59,24 @@ std::vector<GameCommand> BotController::update(const GameSimulation &p_simulatio
     command.unit_type = UnitType::WORKER;
     commands.push_back(command);
   }
-  else if (!p_simulation.has_barracks(BOT) && bot_essence >= BARRACKS_COST)
+  else if (!p_simulation.has_building(BOT, BuildingType::BARRACKS) &&
+           bot_resources.can_afford(get_building_definition(BuildingType::BARRACKS).cost))
   {
     Vector2 bot_base_position;
     const UnitId builder_id = p_simulation.find_available_worker_id(BOT);
     if (p_simulation.get_base_position(BOT, bot_base_position) && builder_id != -1)
     {
       GameCommand command;
-      command.type = GameCommandType::PLACE_BARRACKS;
+      command.type = GameCommandType::PLACE_BUILDING;
       command.owner = BOT;
+      command.building_type = BuildingType::BARRACKS;
       command.position = bot_base_position + Vector2(-110, 78);
       command.builder_unit_id = builder_id;
       commands.push_back(command);
     }
   }
-  else if (p_simulation.has_completed_barracks(BOT) && bot_essence >= FIGHTER_COST)
+  else if (p_simulation.has_completed_building(BOT, BuildingType::BARRACKS) &&
+           bot_resources.can_afford(get_unit_definition(UnitType::FIGHTER).cost))
   {
     GameCommand command;
     command.type = GameCommandType::TRAIN_UNIT;

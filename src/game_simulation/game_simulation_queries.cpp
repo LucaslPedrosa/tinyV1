@@ -1,6 +1,10 @@
 #include "game_simulation.hpp"
 
+#include "definitions/building_definitions.hpp"
+#include "definitions/unit_definitions.hpp"
 #include "game_constants.hpp"
+
+#include <algorithm>
 
 using namespace godot;
 
@@ -82,38 +86,29 @@ const ResourceNode *GameSimulation::find_resource(int32_t p_id) const {
 	return nullptr;
 }
 
-Base *GameSimulation::find_base(int32_t p_owner) {
-	for (Base &base : bases) {
-		if (base.owner_component.owner == p_owner) {
-			return &base;
-		}
-	}
-	return nullptr;
-}
-
-const Base *GameSimulation::find_base(int32_t p_owner) const {
-	for (const Base &base : bases) {
-		if (base.owner_component.owner == p_owner) {
-			return &base;
-		}
-	}
-	return nullptr;
-}
-
-Barracks *GameSimulation::find_barracks(int32_t p_owner) {
-	for (Barracks &building : barracks) {
-		if (building.owner_component.owner == p_owner) {
+Building *GameSimulation::find_building(int32_t p_owner, BuildingType p_type) {
+	for (Building &building : buildings) {
+		if (building.owner_component.owner == p_owner && building.type == p_type) {
 			return &building;
 		}
 	}
 	return nullptr;
 }
 
-Barracks *GameSimulation::find_barracks_by_id(BuildingId p_id) {
+const Building *GameSimulation::find_building(int32_t p_owner, BuildingType p_type) const {
+	for (const Building &building : buildings) {
+		if (building.owner_component.owner == p_owner && building.type == p_type) {
+			return &building;
+		}
+	}
+	return nullptr;
+}
+
+Building *GameSimulation::find_building_by_id(BuildingId p_id) {
 	if (p_id == -1) {
 		return nullptr;
 	}
-	for (Barracks &building : barracks) {
+	for (Building &building : buildings) {
 		if (building.id == p_id) {
 			return &building;
 		}
@@ -121,11 +116,11 @@ Barracks *GameSimulation::find_barracks_by_id(BuildingId p_id) {
 	return nullptr;
 }
 
-const Barracks *GameSimulation::find_barracks_by_id(BuildingId p_id) const {
+const Building *GameSimulation::find_building_by_id(BuildingId p_id) const {
 	if (p_id == -1) {
 		return nullptr;
 	}
-	for (const Barracks &building : barracks) {
+	for (const Building &building : buildings) {
 		if (building.id == p_id) {
 			return &building;
 		}
@@ -133,9 +128,9 @@ const Barracks *GameSimulation::find_barracks_by_id(BuildingId p_id) const {
 	return nullptr;
 }
 
-Barracks *GameSimulation::find_completed_barracks(int32_t p_owner) {
-	for (Barracks &building : barracks) {
-		if (building.owner_component.owner == p_owner && building.construction_component.completed) {
+Building *GameSimulation::find_completed_building(int32_t p_owner, BuildingType p_type) {
+	for (Building &building : buildings) {
+		if (building.owner_component.owner == p_owner && building.type == p_type && building.construction_component.completed) {
 			return &building;
 		}
 	}
@@ -150,13 +145,16 @@ const String &GameSimulation::get_winner_text() const {
 	return winner_text;
 }
 
-int32_t GameSimulation::get_essence(PlayerId p_owner) const {
-	return p_owner == PLAYER ? player_essence : bot_essence;
+int32_t GameSimulation::get_gold(PlayerId p_owner) const {
+	return get_resources(p_owner).gold;
+}
+
+const ResourceWallet &GameSimulation::get_resources(PlayerId p_owner) const {
+	return p_owner == PLAYER ? player_resources : bot_resources;
 }
 
 void GameSimulation::build_render_snapshot(RenderSnapshot &r_snapshot) const {
 	r_snapshot.resources.clear();
-	r_snapshot.bases.clear();
 	r_snapshot.buildings.clear();
 	r_snapshot.units.clear();
 
@@ -165,36 +163,23 @@ void GameSimulation::build_render_snapshot(RenderSnapshot &r_snapshot) const {
 		r_snapshot.resources.push_back({ resource.id, resource.position, resource.amount });
 	}
 
-	r_snapshot.bases.reserve(bases.size());
-	for (const Base &base : bases) {
-		BaseSummary summary;
-		summary.owner = base.owner_component.owner;
-		summary.position = base.transform_component.position;
-		summary.hp = base.health_component.hp;
-		summary.max_hp = 400.0f;
-		summary.train_timer = base.production_component.train_timer;
-		summary.train_duration = base.production_component.train_duration;
-		summary.training_worker = base.production_component.training;
-		summary.worker_queue = base.production_component.queue;
-		summary.has_rally_point = base.rally_component.has_rally_action;
-		summary.rally_point = base.rally_component.position;
-		r_snapshot.bases.push_back(summary);
-	}
-
-	r_snapshot.buildings.reserve(barracks.size());
-	for (const Barracks &building : barracks) {
+	r_snapshot.buildings.reserve(buildings.size());
+	for (const Building &building : buildings) {
+		const BuildingDefinition &definition = get_building_definition(building.type);
 		BuildingSummary summary;
 		summary.id = building.id;
+		summary.type = building.type;
 		summary.owner = building.owner_component.owner;
 		summary.position = building.transform_component.position;
 		summary.hp = building.health_component.hp;
-		summary.max_hp = 250.0f;
+		summary.max_hp = definition.max_hp;
 		summary.build_progress = building.construction_component.build_progress;
 		summary.completed = building.construction_component.completed;
 		summary.train_timer = building.production_component.train_timer;
 		summary.train_duration = building.production_component.train_duration;
-		summary.training_fighter = building.production_component.training;
-		summary.fighter_queue = building.production_component.queue;
+		summary.training = building.production_component.training;
+		summary.active_unit = building.production_component.active_unit;
+		summary.queue_count = building.production_component.queue_count;
 		summary.has_rally_point = building.rally_component.has_rally_action;
 		summary.rally_point = building.rally_component.position;
 		r_snapshot.buildings.push_back(summary);
@@ -202,6 +187,7 @@ void GameSimulation::build_render_snapshot(RenderSnapshot &r_snapshot) const {
 
 	r_snapshot.units.reserve(units.size());
 	for (const Unit &unit : units) {
+		const UnitDefinition &definition = get_unit_definition(unit.type);
 		UnitSummary summary;
 		summary.id = unit.object.id;
 		summary.owner = unit.object.owner_component.owner;
@@ -209,7 +195,7 @@ void GameSimulation::build_render_snapshot(RenderSnapshot &r_snapshot) const {
 		summary.order = unit.order;
 		summary.position = unit.object.transform_component.position;
 		summary.hp = unit.object.health_component.hp;
-		summary.max_hp = unit.type == UnitType::WORKER ? 45.0f : 80.0f;
+		summary.max_hp = definition.max_hp;
 		summary.moving = unit.order == UnitOrder::MOVE || unit.order == UnitOrder::RETURN || unit.order == UnitOrder::ATTACK || unit.order == UnitOrder::BUILD || (unit.order == UnitOrder::GATHER && !unit.gather_component.gathering_resource);
 		r_snapshot.units.push_back(summary);
 	}
@@ -258,13 +244,14 @@ bool GameSimulation::get_unit_position(UnitId p_id, Vector2 &r_position) const {
 bool GameSimulation::get_unit_summary(UnitId p_id, UnitSummary &r_summary) const {
 	for (const Unit &unit : units) {
 		if (unit.object.id == p_id) {
+			const UnitDefinition &definition = get_unit_definition(unit.type);
 			r_summary.id = unit.object.id;
 			 r_summary.owner = unit.object.owner_component.owner;
 			r_summary.type = unit.type;
 			r_summary.order = unit.order;
 			r_summary.position = unit.object.transform_component.position;
 			r_summary.hp = unit.object.health_component.hp;
-			r_summary.max_hp = unit.type == UnitType::WORKER ? 45.0f : 80.0f;
+			r_summary.max_hp = definition.max_hp;
 			r_summary.moving = unit.order == UnitOrder::MOVE || unit.order == UnitOrder::RETURN || unit.order == UnitOrder::ATTACK || unit.order == UnitOrder::BUILD || (unit.order == UnitOrder::GATHER && !unit.gather_component.gathering_resource);
 			return true;
 		}
@@ -272,39 +259,23 @@ bool GameSimulation::get_unit_summary(UnitId p_id, UnitSummary &r_summary) const
 	return false;
 }
 
-bool GameSimulation::get_base_summary(PlayerId p_owner, BaseSummary &r_summary) const {
-	for (const Base &base : bases) {
-		if (base.owner_component.owner == p_owner) {
-			r_summary.owner = base.owner_component.owner;
-			r_summary.position = base.transform_component.position;
-			r_summary.hp = base.health_component.hp;
-			r_summary.max_hp = 400.0f;
-			r_summary.train_timer = base.production_component.train_timer;
-			r_summary.train_duration = base.production_component.train_duration;
-			r_summary.training_worker = base.production_component.training;
-			r_summary.worker_queue = base.production_component.queue;
-			r_summary.has_rally_point = base.rally_component.has_rally_action;
-			r_summary.rally_point = base.rally_component.position;
-			return true;
-		}
-	}
-	return false;
-}
-
 bool GameSimulation::get_building_summary(BuildingId p_id, BuildingSummary &r_summary) const {
-	for (const Barracks &building : barracks) {
+	for (const Building &building : buildings) {
 		if (building.id == p_id) {
+			const BuildingDefinition &definition = get_building_definition(building.type);
 			r_summary.id = building.id;
+			r_summary.type = building.type;
 			r_summary.owner = building.owner_component.owner;
 			r_summary.position = building.transform_component.position;
 			r_summary.hp = building.health_component.hp;
-			r_summary.max_hp = 250.0f;
+			r_summary.max_hp = definition.max_hp;
 			r_summary.build_progress = building.construction_component.build_progress;
 			r_summary.completed = building.construction_component.completed;
 			r_summary.train_timer = building.production_component.train_timer;
 			r_summary.train_duration = building.production_component.train_duration;
-			r_summary.training_fighter = building.production_component.training;
-			r_summary.fighter_queue = building.production_component.queue;
+			r_summary.training = building.production_component.training;
+			r_summary.active_unit = building.production_component.active_unit;
+			r_summary.queue_count = building.production_component.queue_count;
 			r_summary.has_rally_point = building.rally_component.has_rally_action;
 			r_summary.rally_point = building.rally_component.position;
 			return true;
@@ -324,27 +295,27 @@ bool GameSimulation::get_resource_position(ResourceId p_id, Vector2 &r_position)
 }
 
 bool GameSimulation::get_base_position(PlayerId p_owner, Vector2 &r_position) const {
-	for (const Base &base : bases) {
-		if (base.owner_component.owner == p_owner) {
-			r_position = base.transform_component.position;
+	for (const Building &building : buildings) {
+		if (building.owner_component.owner == p_owner && building.type == BuildingType::TOWN_CENTER) {
+			r_position = building.transform_component.position;
 			return true;
 		}
 	}
 	return false;
 }
 
-bool GameSimulation::has_barracks(PlayerId p_owner) const {
-	for (const Barracks &building : barracks) {
-		if (building.owner_component.owner == p_owner) {
+bool GameSimulation::has_building(PlayerId p_owner, BuildingType p_type) const {
+	for (const Building &building : buildings) {
+		if (building.owner_component.owner == p_owner && building.type == p_type) {
 			return true;
 		}
 	}
 	return false;
 }
 
-bool GameSimulation::has_completed_barracks(PlayerId p_owner) const {
-	for (const Barracks &building : barracks) {
-		if (building.owner_component.owner == p_owner && building.construction_component.completed) {
+bool GameSimulation::has_completed_building(PlayerId p_owner, BuildingType p_type) const {
+	for (const Building &building : buildings) {
+		if (building.owner_component.owner == p_owner && building.type == p_type && building.construction_component.completed) {
 			return true;
 		}
 	}
@@ -352,21 +323,92 @@ bool GameSimulation::has_completed_barracks(PlayerId p_owner) const {
 }
 
 bool GameSimulation::can_train_worker(PlayerId p_owner) const {
-	BaseSummary base;
-	return get_base_summary(p_owner, base) && base.worker_queue < MAX_TRAIN_QUEUE && get_essence(p_owner) >= WORKER_COST;
+	const Building *town_center = find_building(p_owner, BuildingType::TOWN_CENTER);
+	return town_center != nullptr && town_center->production_component.queue_count < MAX_TRAIN_QUEUE && get_resources(p_owner).can_afford(get_unit_definition(UnitType::WORKER).cost);
 }
 
 bool GameSimulation::can_train_fighter(PlayerId p_owner, BuildingId p_source_building_id) const {
 	BuildingSummary building;
 	if (get_building_summary(p_source_building_id, building) && building.owner == p_owner) {
-		return building.completed && building.fighter_queue < MAX_TRAIN_QUEUE && get_essence(p_owner) >= FIGHTER_COST;
+		return building.completed && building.queue_count < MAX_TRAIN_QUEUE && get_resources(p_owner).can_afford(get_unit_definition(UnitType::FIGHTER).cost);
 	}
-	return has_completed_barracks(p_owner) && get_essence(p_owner) >= FIGHTER_COST;
+	return has_completed_building(p_owner, BuildingType::BARRACKS) && get_resources(p_owner).can_afford(get_unit_definition(UnitType::FIGHTER).cost);
 }
 
-bool GameSimulation::can_start_barracks_placement(PlayerId p_owner, UnitId p_builder_unit_id) const {
+bool GameSimulation::can_start_building_placement(PlayerId p_owner, UnitId p_builder_unit_id,
+                                                  BuildingType p_type) const {
 	UnitSummary builder;
-	return get_unit_summary(p_builder_unit_id, builder) && builder.owner == p_owner && builder.type == UnitType::WORKER && get_essence(p_owner) >= BARRACKS_COST;
+	if (!get_unit_summary(p_builder_unit_id, builder) || builder.owner != p_owner) {
+		return false;
+	}
+	const UnitDefinition &unit_definition = get_unit_definition(builder.type);
+	return std::find(unit_definition.buildable_buildings.begin(), unit_definition.buildable_buildings.end(), p_type) != unit_definition.buildable_buildings.end() && get_resources(p_owner).can_afford(get_building_definition(p_type).cost);
+}
+
+void GameSimulation::get_available_actions(PlayerId p_owner,
+                                           const std::vector<UnitId> &p_selected_unit_ids,
+                                           BuildingId p_selected_building_id,
+                                           std::vector<AvailableAction> &r_actions) const {
+	r_actions.clear();
+
+	if (!p_selected_unit_ids.empty()) {
+		UnitSummary first_unit;
+		if (!get_unit_summary(p_selected_unit_ids.front(), first_unit) || first_unit.owner != p_owner) {
+			return;
+		}
+
+		const UnitDefinition &unit_definition = get_unit_definition(first_unit.type);
+		for (BuildingType building_type : unit_definition.buildable_buildings) {
+			const BuildingDefinition &building_definition = get_building_definition(building_type);
+			AvailableAction action;
+			action.type = AvailableActionType::BUILD_BUILDING;
+			action.building_type = building_type;
+			action.cost = building_definition.cost;
+			action.enabled = get_resources(p_owner).can_afford(building_definition.cost);
+			r_actions.push_back(action);
+		}
+		return;
+	}
+
+	BuildingSummary building;
+	if (!get_building_summary(p_selected_building_id, building) || building.owner != p_owner) {
+		return;
+	}
+
+	const BuildingDefinition &building_definition = get_building_definition(building.type);
+	for (UnitType unit_type : building_definition.trainable_units) {
+		const UnitDefinition &unit_definition = get_unit_definition(unit_type);
+		AvailableAction action;
+		action.type = AvailableActionType::TRAIN_UNIT;
+		action.unit_type = unit_type;
+		action.source_building_id = building.id;
+		action.cost = unit_definition.cost;
+		action.enabled = building.completed && building.queue_count < MAX_TRAIN_QUEUE &&
+		                 get_resources(p_owner).can_afford(unit_definition.cost);
+		r_actions.push_back(action);
+	}
+}
+
+bool GameSimulation::does_overlap(const Vector2 &p_position, const Footprint &p_footprint) const {
+	for (const Building &building : buildings) {
+		if (footprints_overlap(p_position, p_footprint, building.transform_component.position, get_building_definition(building.type).footprint)) {
+			return true;
+		}
+	}
+
+	for (const ResourceNode &resource : resources) {
+		if (resource.amount > 0 && footprints_overlap(p_position, p_footprint, resource.position, resource_footprint())) {
+			return true;
+		}
+	}
+
+	for (const Unit &unit : units) {
+		if (unit.object.health_component.hp > 0.0f && footprints_overlap(p_position, p_footprint, unit.object.transform_component.position, unit_footprint(unit))) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 UnitId GameSimulation::find_available_worker_id(PlayerId p_owner) const {
@@ -391,8 +433,8 @@ ResourceId GameSimulation::find_nearest_resource_id(const Vector2 &p_position) c
 	return find_nearest_resource(p_position);
 }
 
-BuildingId GameSimulation::find_player_barracks_id_at(const Vector2 &p_position) const {
-	for (const Barracks &building : barracks) {
+BuildingId GameSimulation::find_player_building_id_at(const Vector2 &p_position) const {
+	for (const Building &building : buildings) {
 		if (building.owner_component.owner == PLAYER && distance_to(p_position, building.transform_component.position) <= BARRACKS_RADIUS + 18.0f) {
 			return building.id;
 		}
@@ -400,8 +442,8 @@ BuildingId GameSimulation::find_player_barracks_id_at(const Vector2 &p_position)
 	return -1;
 }
 
-BuildingId GameSimulation::find_enemy_barracks_id_at(int32_t p_owner, const Vector2 &p_position) const {
-	for (const Barracks &building : barracks) {
+BuildingId GameSimulation::find_enemy_building_id_at(int32_t p_owner, const Vector2 &p_position) const {
+	for (const Building &building : buildings) {
 		if (building.owner_component.owner != p_owner && distance_to(p_position, building.transform_component.position) <= BARRACKS_RADIUS + 18.0f) {
 			return building.id;
 		}

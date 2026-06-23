@@ -143,7 +143,7 @@ The current prototype is a local 1v1 test against a simple bot.
 - Press `Delete` with an unfinished Barracks selected to destroy it and refund 100% of its cost.
 - Press `Delete` with a completed Barracks selected to destroy it and refund 50% of its cost.
 - Right click with selected units to move in a small formation.
-- Right click an Essence node with workers selected to gather.
+- Right click a Gold node with workers selected to gather.
 - Right click ground with fighters selected to attack-move in formation.
 - Right click an enemy unit with fighters selected to attack that unit.
 - Right click an enemy Barracks with fighters selected to attack that Barracks.
@@ -166,7 +166,7 @@ Current prototype pieces:
 - Barracks construction sites built by workers over time
 - Workers
 - Fighters
-- Essence nodes
+- Gold nodes
 - Pixel Greece sprites for Worker, Hoplite, Town Center, Barracks, and Gold
 - Bottom HUD with Food, Wood, and Gold resource display
 - Selection HUD with actions, portrait placeholder, name, and details

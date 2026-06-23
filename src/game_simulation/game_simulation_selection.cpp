@@ -26,16 +26,10 @@ SelectionResult GameSimulation::select_at(int32_t p_owner, const Vector2 &p_posi
 		return selection;
 	}
 
-	for (const Base &base : bases) {
-		if (base.owner_component.owner == p_owner && distance_to(p_position, base.transform_component.position) <= BASE_RADIUS + 18.0f) {
-			selection.base_owner = p_owner;
-			return selection;
-		}
-	}
-
-	for (int32_t i = 0; i < static_cast<int32_t>(barracks.size()); ++i) {
-		if (barracks[i].owner_component.owner == p_owner && distance_to(p_position, barracks[i].transform_component.position) <= BARRACKS_RADIUS + 18.0f) {
-			selection.building_id = barracks[i].id;
+	for (int32_t i = 0; i < static_cast<int32_t>(buildings.size()); ++i) {
+		const float selection_radius = buildings[i].type == BuildingType::TOWN_CENTER ? BASE_RADIUS : BARRACKS_RADIUS;
+		if (buildings[i].owner_component.owner == p_owner && distance_to(p_position, buildings[i].transform_component.position) <= selection_radius + 18.0f) {
+			selection.building_id = buildings[i].id;
 			return selection;
 		}
 	}

@@ -13,6 +13,7 @@ game_env.Append(CPPPATH=["src"])
 
 game_env.VariantDir("build/src", "src", duplicate=0)
 sources = Glob("build/src/*.cpp")
+sources += Glob("build/src/definitions/*.cpp")
 sources += Glob("build/src/game_simulation/*.cpp")
 sources += Glob("build/src/rendering/*.cpp")
 target_path = os.path.join("bin", "libtinyv1" + env["suffix"] + env["SHLIBSUFFIX"])

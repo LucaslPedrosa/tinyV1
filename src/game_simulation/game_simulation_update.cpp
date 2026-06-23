@@ -1,5 +1,7 @@
 #include "game_simulation.hpp"
 
+#include "definitions/building_definitions.hpp"
+#include "definitions/unit_definitions.hpp"
 #include "game_constants.hpp"
 
 #include <algorithm>
@@ -29,7 +31,7 @@ godot::Vector2 safe_normalized(const godot::Vector2 &p_vector) {
 }
 
 float unit_collision_radius(const Unit &p_unit) {
-	return p_unit.type == UnitType::WORKER ? 5.0f : 7.0f;
+	return get_unit_definition(p_unit.type).collision_radius;
 }
 
 godot::Vector2 avoidance_from_circle(const godot::Vector2 &p_position, const godot::Vector2 &p_obstacle_position, float p_avoid_radius) {
@@ -61,13 +63,39 @@ void GameSimulation::update_unit_timers(Unit &p_unit, double p_delta) {
 }
 
 void GameSimulation::update_unit_auto_aggro(Unit &p_unit) {
-	(void)p_unit;
-	// Melee units should not break formation or override explicit orders just
-	// because an enemy walks nearby. Attack-move handles opportunistic targets
-	// inside update_unit_attack when no explicit target is assigned.
+	if (p_unit.order != UnitOrder::IDLE) {
+		return;
+	}
+
+	const UnitId nearby_enemy_id = find_enemy_unit_id(p_unit.object.owner_component.owner, p_unit.object.transform_component.position, AUTO_AGGRO_RANGE);
+	if (nearby_enemy_id != -1) {
+		enter_unit_combat(p_unit, nearby_enemy_id);
+	}
 }
 
-void GameSimulation::move_unit_toward_with_avoidance(Unit &p_unit, const godot::Vector2 &p_target, float p_max_distance, ResourceId p_ignored_resource, BuildingId p_ignored_building, PlayerId p_ignored_base_owner) {
+bool GameSimulation::enter_unit_combat(Unit &p_unit, UnitId p_target_unit_id) {
+	Unit *target = find_unit(p_target_unit_id);
+	if (target == nullptr || target->object.health_component.hp <= 0.0f || target->object.owner_component.owner == p_unit.object.owner_component.owner) {
+		return false;
+	}
+
+	p_unit.gather_component.gathering_resource = false;
+	p_unit.build_component.target_building_id = -1;
+	p_unit.combat_component.target_unit_id = target->object.id;
+	p_unit.combat_component.target_building_id = -1;
+	p_unit.movement_component.target_position = target->object.transform_component.position;
+	p_unit.order = UnitOrder::ATTACK;
+	return true;
+}
+
+void GameSimulation::damage_unit(Unit &p_attacker, Unit &p_target) {
+	p_target.object.health_component.hp -= unit_attack_damage(p_attacker);
+	if (p_target.object.health_component.hp > 0.0f && p_target.order == UnitOrder::IDLE) {
+		enter_unit_combat(p_target, p_attacker.object.id);
+	}
+}
+
+void GameSimulation::move_unit_toward_with_avoidance(Unit &p_unit, const godot::Vector2 &p_target, float p_max_distance, ResourceId p_ignored_resource, BuildingId p_ignored_building) {
 	const godot::Vector2 position = p_unit.object.transform_component.position;
 	godot::Vector2 desired = safe_normalized(p_target - position);
 	godot::Vector2 avoidance;
@@ -80,14 +108,7 @@ void GameSimulation::move_unit_toward_with_avoidance(Unit &p_unit, const godot::
 		avoidance += avoidance_from_circle(position, resource.position, RESOURCE_RADIUS + unit_radius_value + STATIC_OBSTACLE_MARGIN) * STATIC_AVOIDANCE_WEIGHT;
 	}
 
-	for (const Base &base : bases) {
-		if (base.owner_component.owner == p_ignored_base_owner) {
-			continue;
-		}
-		avoidance += avoidance_from_circle(position, base.transform_component.position, BASE_RADIUS + unit_radius_value + STATIC_OBSTACLE_MARGIN) * STATIC_AVOIDANCE_WEIGHT;
-	}
-
-	for (const Barracks &building : barracks) {
+	for (const Building &building : buildings) {
 		if (building.id == p_ignored_building) {
 			continue;
 		}
@@ -107,7 +128,7 @@ void GameSimulation::move_unit_toward_with_avoidance(Unit &p_unit, const godot::
 }
 
 void GameSimulation::update_unit_build(Unit &p_unit, double p_delta) {
-	Barracks *building = find_barracks_by_id(p_unit.build_component.target_building_id);
+	Building *building = find_building_by_id(p_unit.build_component.target_building_id);
 	if (building == nullptr) {
 		p_unit.order = UnitOrder::IDLE;
 		return;
@@ -123,7 +144,8 @@ void GameSimulation::update_unit_build(Unit &p_unit, double p_delta) {
 		return;
 	}
 
-	building->construction_component.build_progress = std::min(1.0f, building->construction_component.build_progress + static_cast<float>(p_delta) / BARRACKS_BUILD_TIME);
+	const BuildingDefinition &definition = get_building_definition(building->type);
+	building->construction_component.build_progress = std::min(1.0f, building->construction_component.build_progress + static_cast<float>(p_delta) / definition.build_time);
 	if (building->construction_component.build_progress >= 1.0f) {
 		building->construction_component.completed = true;
 		p_unit.order = UnitOrder::IDLE;
@@ -174,21 +196,21 @@ void GameSimulation::update_unit_gather(Unit &p_unit, double p_delta) {
 }
 
 void GameSimulation::update_unit_return(Unit &p_unit, double p_delta) {
-	Base *base = find_base(p_unit.object.owner_component.owner);
-	if (base == nullptr) {
+	Building *town_center = find_building(p_unit.object.owner_component.owner, BuildingType::TOWN_CENTER);
+	if (town_center == nullptr) {
 		p_unit.order = UnitOrder::IDLE;
 		return;
 	}
 
-	if (distance_to(p_unit.object.transform_component.position, base->transform_component.position) > RETURN_DISTANCE) {
-		move_unit_toward_with_avoidance(p_unit, base->transform_component.position, unit_speed(p_unit) * static_cast<float>(p_delta), -1, -1, base->owner_component.owner);
+	if (distance_to(p_unit.object.transform_component.position, town_center->transform_component.position) > RETURN_DISTANCE) {
+		move_unit_toward_with_avoidance(p_unit, town_center->transform_component.position, unit_speed(p_unit) * static_cast<float>(p_delta), -1, town_center->id);
 		return;
 	}
 
 	if (p_unit.object.owner_component.owner == PLAYER) {
-		player_essence += p_unit.gather_component.carrying;
+		player_resources.gold += p_unit.gather_component.carrying;
 	} else {
-		bot_essence += p_unit.gather_component.carrying;
+		bot_resources.gold += p_unit.gather_component.carrying;
 	}
 	p_unit.gather_component.carrying = 0;
 	p_unit.gather_component.gathering_resource = false;
@@ -196,7 +218,7 @@ void GameSimulation::update_unit_return(Unit &p_unit, double p_delta) {
 }
 
 void GameSimulation::update_unit_attack(Unit &p_unit, double p_delta) {
-	const bool has_explicit_structure_target = p_unit.combat_component.target_base_owner != -1 || p_unit.combat_component.target_building_id != -1;
+	const bool has_explicit_structure_target = p_unit.combat_component.target_building_id != -1;
 	Unit *enemy_unit = find_unit(p_unit.combat_component.target_unit_id);
 	if (enemy_unit == nullptr && !has_explicit_structure_target) {
 		const int32_t nearby_enemy_id = find_enemy_unit_id(p_unit.object.owner_component.owner, p_unit.object.transform_component.position, unit_attack_range(p_unit));
@@ -209,14 +231,14 @@ void GameSimulation::update_unit_attack(Unit &p_unit, double p_delta) {
 			return;
 		}
 		if (p_unit.combat_component.attack_timer <= 0.0f) {
-			enemy_unit->object.health_component.hp -= unit_attack_damage(p_unit);
-			p_unit.combat_component.attack_timer = 0.8f;
+			damage_unit(p_unit, *enemy_unit);
+			p_unit.combat_component.attack_timer = get_unit_definition(p_unit.type).attack_cooldown;
 		}
 		return;
 	}
 
 	if (p_unit.combat_component.target_building_id != -1) {
-		Barracks *target = find_barracks_by_id(p_unit.combat_component.target_building_id);
+		Building *target = find_building_by_id(p_unit.combat_component.target_building_id);
 		if (target != nullptr && target->owner_component.owner != p_unit.object.owner_component.owner) {
 			if (distance_to(p_unit.object.transform_component.position, target->transform_component.position) > unit_attack_range(p_unit) + BARRACKS_RADIUS) {
 				move_unit_toward_with_avoidance(p_unit, target->transform_component.position, unit_speed(p_unit) * static_cast<float>(p_delta), -1, target->id);
@@ -225,34 +247,15 @@ void GameSimulation::update_unit_attack(Unit &p_unit, double p_delta) {
 
 			if (p_unit.combat_component.attack_timer <= 0.0f) {
 				target->health_component.hp -= unit_attack_damage(p_unit);
-				p_unit.combat_component.attack_timer = 0.8f;
+				p_unit.combat_component.attack_timer = get_unit_definition(p_unit.type).attack_cooldown;
 			}
 			return;
 		}
 	}
 
-	if (p_unit.combat_component.target_base_owner == -1) {
-		move_unit_toward_with_avoidance(p_unit, p_unit.movement_component.target_position, unit_speed(p_unit) * static_cast<float>(p_delta));
-		if (distance_to(p_unit.object.transform_component.position, p_unit.movement_component.target_position) <= 2.0f) {
-			p_unit.order = UnitOrder::IDLE;
-		}
-		return;
-	}
-
-	Base *enemy_base = find_base(p_unit.combat_component.target_base_owner);
-	if (enemy_base == nullptr) {
+	move_unit_toward_with_avoidance(p_unit, p_unit.movement_component.target_position, unit_speed(p_unit) * static_cast<float>(p_delta));
+	if (distance_to(p_unit.object.transform_component.position, p_unit.movement_component.target_position) <= 2.0f) {
 		p_unit.order = UnitOrder::IDLE;
-		return;
-	}
-
-	if (distance_to(p_unit.object.transform_component.position, enemy_base->transform_component.position) > unit_attack_range(p_unit) + BASE_RADIUS) {
-		move_unit_toward_with_avoidance(p_unit, enemy_base->transform_component.position, unit_speed(p_unit) * static_cast<float>(p_delta), -1, -1, enemy_base->owner_component.owner);
-		return;
-	}
-
-	if (p_unit.combat_component.attack_timer <= 0.0f) {
-		enemy_base->health_component.hp -= unit_attack_damage(p_unit);
-		p_unit.combat_component.attack_timer = 0.8f;
 	}
 }
 
@@ -260,7 +263,7 @@ void GameSimulation::update_unit(Unit &p_unit, double p_delta) {
 	update_unit_timers(p_unit, p_delta);
 	update_unit_auto_aggro(p_unit);
 
-	if (p_unit.order == UnitOrder::BUILD && p_unit.type == UnitType::WORKER) {
+	if (p_unit.order == UnitOrder::BUILD) {
 		update_unit_build(p_unit, p_delta);
 		return;
 	}

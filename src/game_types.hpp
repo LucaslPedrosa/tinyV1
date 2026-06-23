@@ -2,10 +2,12 @@
 
 #include <godot_cpp/variant/vector2.hpp>
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
-namespace tinyv1 {
+namespace tinyv1
+{
 
 using PlayerId = int32_t;
 using UnitId = int32_t;
@@ -13,203 +15,322 @@ using BuildingId = int32_t;
 using ResourceId = int32_t;
 using ObjectId = int32_t;
 
-enum class ResourceType {
-	ESSENCE,
+inline constexpr int32_t PRODUCTION_QUEUE_CAPACITY = 3;
+
+enum class ResourceType
+{
+  FOOD,
+  GOLD,
+  WOOD,
+  FAVOR
 };
 
-enum class UnitType {
-	WORKER,
-	FIGHTER,
+struct ResourceCost
+{
+  int32_t food = 0;
+  int32_t wood = 0;
+  int32_t gold = 0;
+  int32_t favor = 0;
 };
 
-enum class UnitOrder {
-	IDLE,
-	MOVE,
-	GATHER,
-	RETURN,
-	ATTACK,
-	BUILD,
+struct ResourceWallet
+{
+  int32_t food = 0;
+  int32_t wood = 0;
+  int32_t gold = 0;
+  int32_t favor = 0;
+
+  bool can_afford(const ResourceCost &p_cost) const
+  {
+    return food >= p_cost.food && wood >= p_cost.wood && gold >= p_cost.gold &&
+           favor >= p_cost.favor;
+  }
+
+  void spend(const ResourceCost &p_cost)
+  {
+    food -= p_cost.food;
+    wood -= p_cost.wood;
+    gold -= p_cost.gold;
+    favor -= p_cost.favor;
+  }
+
+  void add(const ResourceCost &p_amount)
+  {
+    food += p_amount.food;
+    wood += p_amount.wood;
+    gold += p_amount.gold;
+    favor += p_amount.favor;
+  }
 };
 
-struct ResourceNode {
-	int32_t id = 0;
-	ResourceType type = ResourceType::ESSENCE;
-	godot::Vector2 position;
-	int32_t amount = 0;
+enum class FootprintShape
+{
+  RECT,
+  CIRCLE,
 };
 
-struct OwnerComponent {
-	PlayerId owner = -1;
+struct Footprint
+{
+  FootprintShape shape = FootprintShape::CIRCLE;
+  float size = 0.0f;
 };
 
-struct TransformComponent {
-	godot::Vector2 position;
+enum class UnitType
+{
+  WORKER,
+  FIGHTER,
+  CAVALRY,
 };
 
-struct HealthComponent {
-	float hp = 0.0f;
-	float max_hp = 0.0f;
+enum class BuildingType
+{
+  TOWN_CENTER,
+  BARRACKS,
+  STABLE,
 };
 
-struct GameObject {
-	ObjectId id = -1;
-	OwnerComponent owner_component;
-	TransformComponent transform_component;
-	HealthComponent health_component;
+enum class UnitOrder
+{
+  IDLE,
+  MOVE,
+  GATHER,
+  RETURN,
+  ATTACK,
+  BUILD,
 };
 
-enum class RallyActionType {
-	NONE,
-	MOVE,
-	GATHER,
-	ATTACK_MOVE,
-	ATTACK_UNIT,
-	ATTACK_BUILDING,
-	ATTACK_BASE,
+enum class AvailableActionType
+{
+  BUILD_BUILDING,
+  TRAIN_UNIT,
+  DELETE_OBJECT,
 };
 
-struct RallyActionComponent {
-	bool has_rally_action = false;
-	RallyActionType type = RallyActionType::NONE;
-	godot::Vector2 position;
-	ResourceId target_resource = -1;
-	UnitId target_unit_id = -1;
-	BuildingId target_building_id = -1;
-	PlayerId target_base_owner = -1;
+struct AvailableAction
+{
+  AvailableActionType type = AvailableActionType::BUILD_BUILDING;
+  bool enabled = false;
+  ResourceCost cost;
+  UnitType unit_type = UnitType::WORKER;
+  BuildingType building_type = BuildingType::BARRACKS;
+  BuildingId source_building_id = -1;
 };
 
-struct ProductionQueueComponent {
-	int32_t queue = 0;
-	bool training = false;
-	float train_timer = 0.0f;
-	float train_duration = 0.0f;
+struct ResourceNode
+{
+  int32_t id = 0;
+  ResourceType type = ResourceType::GOLD;
+  godot::Vector2 position;
+  int32_t amount = 0;
 };
 
-struct ConstructionComponent {
-	float build_progress = 0.0f;
-	bool completed = false;
+struct OwnerComponent
+{
+  PlayerId owner = -1;
 };
 
-struct MovementComponent {
-	godot::Vector2 target_position;
+struct TransformComponent
+{
+  godot::Vector2 position;
 };
 
-struct CombatComponent {
-	float attack_timer = 0.0f;
-	int32_t target_unit_id = -1;
-	int32_t target_base_owner = -1;
-	BuildingId target_building_id = -1;
+struct HealthComponent
+{
+  float hp = 0.0f;
+  float max_hp = 0.0f;
 };
 
-struct GatherRule {
-	ResourceType resource_type = ResourceType::ESSENCE;
-	float gather_time = 0.0f;
-	int32_t amount_per_trip = 0;
+struct GameObject
+{
+  ObjectId id = -1;
+  OwnerComponent owner_component;
+  TransformComponent transform_component;
+  HealthComponent health_component;
 };
 
-struct GatherComponent {
-	std::vector<GatherRule> rules;
-	float gather_timer = 0.0f;
-	bool gathering_resource = false;
-	int32_t carrying = 0;
-	ResourceType carrying_resource_type = ResourceType::ESSENCE;
-	ResourceId target_resource = -1;
+enum class RallyActionType
+{
+  NONE,
+  MOVE,
+  GATHER,
+  ATTACK_MOVE,
+  ATTACK_UNIT,
+  ATTACK_BUILDING,
 };
 
-struct BuildComponent {
-	BuildingId target_building_id = -1;
+struct RallyActionComponent
+{
+  bool has_rally_action = false;
+  RallyActionType type = RallyActionType::NONE;
+  godot::Vector2 position;
+  ResourceId target_resource = -1;
+  UnitId target_unit_id = -1;
+  BuildingId target_building_id = -1;
 };
 
-struct Base {
-	OwnerComponent owner_component;
-	TransformComponent transform_component;
-	HealthComponent health_component;
-	ProductionQueueComponent production_component;
-	RallyActionComponent rally_component;
+struct ProductionQueueComponent
+{
+  std::array<UnitType, PRODUCTION_QUEUE_CAPACITY> queued_units{};
+  int32_t queue_start = 0;
+  int32_t queue_count = 0;
+  bool training = false;
+  UnitType active_unit = UnitType::WORKER;
+  float train_timer = 0.0f;
+  float train_duration = 0.0f;
+
+  bool is_full() const
+  {
+    return queue_count >= PRODUCTION_QUEUE_CAPACITY;
+  }
+
+  bool is_empty() const
+  {
+    return queue_count <= 0;
+  }
+
+  bool push(UnitType p_type)
+  {
+    if (is_full())
+    {
+      return false;
+    }
+    const int32_t index = (queue_start + queue_count) % PRODUCTION_QUEUE_CAPACITY;
+    queued_units[index] = p_type;
+    ++queue_count;
+    return true;
+  }
+
+  bool pop(UnitType &r_type)
+  {
+    if (is_empty())
+    {
+      return false;
+    }
+    r_type = queued_units[queue_start];
+    queue_start = (queue_start + 1) % PRODUCTION_QUEUE_CAPACITY;
+    --queue_count;
+    return true;
+  }
 };
 
-struct Barracks {
-	BuildingId id = -1;
-	OwnerComponent owner_component;
-	TransformComponent transform_component;
-	HealthComponent health_component;
-	ConstructionComponent construction_component;
-	ProductionQueueComponent production_component;
-	RallyActionComponent rally_component;
+struct ConstructionComponent
+{
+  float build_progress = 0.0f;
+  bool completed = false;
 };
 
-struct Unit {
-	GameObject object;
-	UnitType type = UnitType::WORKER;
-	UnitOrder order = UnitOrder::IDLE;
-	MovementComponent movement_component;
-	CombatComponent combat_component;
-	GatherComponent gather_component;
-	BuildComponent build_component;
+struct MovementComponent
+{
+  godot::Vector2 target_position;
 };
 
-struct UnitSummary {
-	UnitId id = -1;
-	PlayerId owner = -1;
-	UnitType type = UnitType::WORKER;
-	UnitOrder order = UnitOrder::IDLE;
-	godot::Vector2 position;
-	float hp = 0.0f;
-	float max_hp = 0.0f;
-	bool moving = false;
+struct CombatComponent
+{
+  float attack_timer = 0.0f;
+  int32_t target_unit_id = -1;
+  BuildingId target_building_id = -1;
 };
 
-struct ResourceSummary {
-	ResourceId id = -1;
-	godot::Vector2 position;
-	int32_t amount = 0;
+struct GatherRule
+{
+  ResourceType resource_type = ResourceType::GOLD;
+  float gather_time = 0.0f;
+  int32_t amount_per_trip = 0;
 };
 
-struct BaseSummary {
-	PlayerId owner = -1;
-	godot::Vector2 position;
-	float hp = 0.0f;
-	float max_hp = 400.0f;
-	float train_timer = 0.0f;
-	float train_duration = 0.0f;
-	bool training_worker = false;
-	int32_t worker_queue = 0;
-	bool has_rally_point = false;
-	godot::Vector2 rally_point;
+struct GatherComponent
+{
+  std::vector<GatherRule> rules;
+  float gather_timer = 0.0f;
+  bool gathering_resource = false;
+  int32_t carrying = 0;
+  ResourceType carrying_resource_type = ResourceType::GOLD;
+  ResourceId target_resource = -1;
 };
 
-struct BuildingSummary {
-	BuildingId id = -1;
-	PlayerId owner = -1;
-	godot::Vector2 position;
-	float hp = 0.0f;
-	float max_hp = 250.0f;
-	float build_progress = 0.0f;
-	bool completed = false;
-	float train_timer = 0.0f;
-	float train_duration = 0.0f;
-	bool training_fighter = false;
-	int32_t fighter_queue = 0;
-	bool has_rally_point = false;
-	godot::Vector2 rally_point;
+struct BuildComponent
+{
+  BuildingId target_building_id = -1;
 };
 
-struct CommandFeedback {
-	bool has_marker = false;
-	godot::Vector2 marker_position;
+struct Building
+{
+  BuildingId id = -1;
+  BuildingType type = BuildingType::BARRACKS;
+  OwnerComponent owner_component;
+  TransformComponent transform_component;
+  HealthComponent health_component;
+  ConstructionComponent construction_component;
+  ProductionQueueComponent production_component;
+  RallyActionComponent rally_component;
 };
 
-struct SelectionResult {
-	std::vector<int32_t> unit_ids;
-	int32_t base_owner = -1;
-	BuildingId building_id = -1;
+struct Unit
+{
+  GameObject object;
+  UnitType type = UnitType::WORKER;
+  UnitOrder order = UnitOrder::IDLE;
+  MovementComponent movement_component;
+  CombatComponent combat_component;
+  GatherComponent gather_component;
+  BuildComponent build_component;
 };
 
-struct RenderSnapshot {
-	std::vector<ResourceSummary> resources;
-	std::vector<BaseSummary> bases;
-	std::vector<BuildingSummary> buildings;
-	std::vector<UnitSummary> units;
+struct UnitSummary
+{
+  UnitId id = -1;
+  PlayerId owner = -1;
+  UnitType type = UnitType::WORKER;
+  UnitOrder order = UnitOrder::IDLE;
+  godot::Vector2 position;
+  float hp = 0.0f;
+  float max_hp = 0.0f;
+  bool moving = false;
+};
+
+struct ResourceSummary
+{
+  ResourceId id = -1;
+  godot::Vector2 position;
+  int32_t amount = 0;
+};
+
+struct BuildingSummary
+{
+  BuildingId id = -1;
+  BuildingType type = BuildingType::BARRACKS;
+  PlayerId owner = -1;
+  godot::Vector2 position;
+  float hp = 0.0f;
+  float max_hp = 0.0f;
+  float build_progress = 0.0f;
+  bool completed = false;
+  float train_timer = 0.0f;
+  float train_duration = 0.0f;
+  bool training = false;
+  UnitType active_unit = UnitType::WORKER;
+  int32_t queue_count = 0;
+  bool has_rally_point = false;
+  godot::Vector2 rally_point;
+};
+
+struct CommandFeedback
+{
+  bool has_marker = false;
+  godot::Vector2 marker_position;
+};
+
+struct SelectionResult
+{
+  std::vector<int32_t> unit_ids;
+  BuildingId building_id = -1;
+};
+
+struct RenderSnapshot
+{
+  std::vector<ResourceSummary> resources;
+  std::vector<BuildingSummary> buildings;
+  std::vector<UnitSummary> units;
 };
 
 } // namespace tinyv1

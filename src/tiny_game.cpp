@@ -3,13 +3,13 @@
 #include "hud_presenter.hpp"
 #include "local_input_controller.hpp"
 
+#include "rendering/hud_constants.hpp"
+#include <algorithm>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/input_event.hpp>
 #include <godot_cpp/classes/input_event_key.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
-
-#include <algorithm>
 
 using namespace godot;
 
@@ -33,10 +33,10 @@ void TinyGame::_bind_methods()
   ClassDB::bind_method(D_METHOD("get_action_button_icon_path", "index"),
                        &TinyGame::get_action_button_icon_path);
   ClassDB::bind_method(D_METHOD("is_action_button_enabled", "index"),
-                        &TinyGame::is_action_button_enabled);
+                       &TinyGame::is_action_button_enabled);
   ClassDB::bind_method(D_METHOD("get_hud_snapshot"), &TinyGame::get_hud_snapshot);
   ClassDB::bind_method(D_METHOD("perform_action_button", "index"),
-                        &TinyGame::perform_action_button);
+                       &TinyGame::perform_action_button);
 }
 
 void TinyGame::_ready()
@@ -72,7 +72,7 @@ void TinyGame::_process(double p_delta)
     sim.apply_command(command);
   }
   sim.remove_dead_units();
-  sim.remove_destroyed_barracks();
+  sim.remove_destroyed_buildings();
   sim.check_win_condition();
   queue_redraw();
 }
@@ -164,7 +164,7 @@ Dictionary TinyGame::get_hud_snapshot() const
   snapshot["selected_details_text"] = HudPresenter::get_selected_details_text(sim, local);
   snapshot["selected_portrait_path"] = HudPresenter::get_selected_portrait_path(sim, local);
 
-  for (int32_t index = 0; index < 2; ++index)
+  for (size_t index = 0; index < HudConstants::ACTION_BUTTON_COUNT; ++index)
   {
     const String suffix = String::num_int64(index);
     snapshot[String("action_button_") + suffix + "_text"] =

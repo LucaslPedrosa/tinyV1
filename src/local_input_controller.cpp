@@ -1,5 +1,6 @@
 #include "local_input_controller.hpp"
 
+#include "definitions/building_definitions.hpp"
 #include "game_command.hpp"
 #include "game_constants.hpp"
 
@@ -17,8 +18,7 @@ namespace tinyv1
 namespace
 {
 
-bool first_selected_unit_summary(const GameSimulation &sim,
-                                 const LocalPlayerState &local,
+bool first_selected_unit_summary(const GameSimulation &sim, const LocalPlayerState &local,
                                  UnitSummary &r_summary)
 {
   for (UnitId unit_id : local.selected_unit_ids)
@@ -33,10 +33,8 @@ bool first_selected_unit_summary(const GameSimulation &sim,
 
 } // namespace
 
-bool LocalInputController::handle_event(const Ref<InputEvent> &event,
-                                        const Vector2 &mouse_position,
-                                        GameSimulation &sim,
-                                        LocalPlayerState &local)
+bool LocalInputController::handle_event(const Ref<InputEvent> &event, const Vector2 &mouse_position,
+                                        GameSimulation &sim, LocalPlayerState &local)
 {
   Ref<InputEventMouseButton> mouse_event = event;
   if (mouse_event.is_valid())
@@ -45,19 +43,23 @@ bool LocalInputController::handle_event(const Ref<InputEvent> &event,
     {
       if (mouse_event->is_pressed())
       {
-        if (local.is_placing_barracks)
+        if (local.is_placing_building)
         {
           GameCommand command;
-          command.type = GameCommandType::PLACE_BARRACKS;
+          command.type = GameCommandType::PLACE_BUILDING;
           command.owner = PLAYER;
+          command.building_type = local.placing_building_type;
           command.position = mouse_position;
           UnitSummary builder;
-          command.builder_unit_id = first_selected_unit_summary(sim, local, builder) ? builder.id : -1;
+          command.builder_unit_id =
+              first_selected_unit_summary(sim, local, builder) ? builder.id : -1;
           const GameCommandResult result = sim.apply_command(command);
           const int32_t building_id = result.placed_building_id;
-          if (sim.get_essence(PLAYER) < BARRACKS_COST || building_id != -1)
+          if (!sim.get_resources(PLAYER).can_afford(
+                  get_building_definition(local.placing_building_type).cost) ||
+              building_id != -1)
           {
-            local.is_placing_barracks = false;
+            local.is_placing_building = false;
             if (building_id != -1)
             {
               local.clear_selection();
@@ -110,13 +112,12 @@ bool LocalInputController::handle_event(const Ref<InputEvent> &event,
     else if (mouse_event->get_button_index() == MouseButton::MOUSE_BUTTON_RIGHT &&
              mouse_event->is_pressed())
     {
-      local.is_placing_barracks = false;
+      local.is_placing_building = false;
       GameCommand command;
       command.type = GameCommandType::COMMAND_SELECTED_TO;
       command.owner = PLAYER;
       command.position = mouse_position;
       command.selected_unit_ids = local.selected_unit_ids;
-      command.selected_base_owner = local.selected_base_owner;
       command.selected_building_id = local.selected_building_id;
       const GameCommandResult result = sim.apply_command(command);
       if (result.feedback.has_marker)
@@ -134,7 +135,7 @@ bool LocalInputController::handle_event(const Ref<InputEvent> &event,
     local.drag_current = mouse_position;
     return true;
   }
-  if (motion_event.is_valid() && local.is_placing_barracks)
+  if (motion_event.is_valid() && local.is_placing_building)
   {
     return true;
   }
@@ -147,14 +148,14 @@ bool LocalInputController::handle_event(const Ref<InputEvent> &event,
 
   if (key_event->get_keycode() == Key::KEY_DELETE)
   {
-    if (local.is_placing_barracks)
+    if (local.is_placing_building)
     {
-      local.is_placing_barracks = false;
+      local.is_placing_building = false;
     }
     else
     {
       GameCommand command;
-      command.type = GameCommandType::DELETE_BARRACKS;
+      command.type = GameCommandType::DELETE_OBJECT;
       command.owner = PLAYER;
       command.selected_building_id = local.selected_building_id;
       sim.apply_command(command);
@@ -172,55 +173,59 @@ bool LocalInputController::handle_event(const Ref<InputEvent> &event,
     sim.apply_command(command);
     return true;
   }
-  if (key_event->get_keycode() == Key::KEY_W && local.selected_base_owner == PLAYER)
+  if (key_event->get_keycode() == Key::KEY_W && local.selected_building_id != -1)
   {
     GameCommand command;
     command.type = GameCommandType::TRAIN_UNIT;
     command.owner = PLAYER;
     command.unit_type = UnitType::WORKER;
+    command.selected_building_id = local.selected_building_id;
     sim.apply_command(command);
     return true;
   }
   if (key_event->get_keycode() == Key::KEY_B && !local.selected_unit_ids.empty() &&
-      sim.can_start_barracks_placement(PLAYER, local.selected_unit_ids.front()))
+      sim.can_start_building_placement(PLAYER, local.selected_unit_ids.front(),
+                                       BuildingType::BARRACKS))
   {
-    local.is_placing_barracks = true;
+    local.is_placing_building = true;
+    local.placing_building_type = BuildingType::BARRACKS;
     return true;
   }
 
   return false;
 }
 
-bool LocalInputController::perform_action_button(int32_t index,
-                                                 GameSimulation &sim,
-                                                 LocalPlayerState &local)
+bool LocalInputController::perform_action_button(int32_t index, GameSimulation &sim,
+                                                  LocalPlayerState &local)
 {
-  if (local.selected_base_owner == PLAYER && index == 0)
+  std::vector<AvailableAction> actions;
+  sim.get_available_actions(PLAYER, local.selected_unit_ids, local.selected_building_id, actions);
+  if (index < 0 || index >= static_cast<int32_t>(actions.size()))
+  {
+    return false;
+  }
+
+  const AvailableAction &action = actions[index];
+  if (!action.enabled)
+  {
+    return false;
+  }
+
+  if (action.type == AvailableActionType::BUILD_BUILDING)
+  {
+    local.is_placing_building = true;
+    local.placing_building_type = action.building_type;
+    return true;
+  }
+
+  if (action.type == AvailableActionType::TRAIN_UNIT)
   {
     GameCommand command;
     command.type = GameCommandType::TRAIN_UNIT;
     command.owner = PLAYER;
-    command.unit_type = UnitType::WORKER;
+    command.unit_type = action.unit_type;
+    command.selected_building_id = action.source_building_id;
     sim.apply_command(command);
-    return true;
-  }
-
-  if (local.selected_building_id != -1 && index == 0)
-  {
-    GameCommand command;
-    command.type = GameCommandType::TRAIN_UNIT;
-    command.owner = PLAYER;
-    command.unit_type = UnitType::FIGHTER;
-    command.selected_building_id = local.selected_building_id;
-    sim.apply_command(command);
-    return true;
-  }
-
-  UnitSummary unit;
-  if (first_selected_unit_summary(sim, local, unit) && unit.type == UnitType::WORKER && index == 0 &&
-      sim.can_start_barracks_placement(PLAYER, unit.id))
-  {
-    local.is_placing_barracks = true;
     return true;
   }
 
